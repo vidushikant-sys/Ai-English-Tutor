@@ -17,20 +17,26 @@ export default function CoachAvatar({
   // Keep references to animate meshes inside the render loop
   const meshesRef = useRef<{
     headGroup: THREE.Group | null;
-    mouth: THREE.Mesh | null;
-    leftEye: THREE.Mesh | null;
-    rightEye: THREE.Mesh | null;
-    statusLight: THREE.Mesh | null;
-    leftEarcupGlow: THREE.Mesh | null;
-    rightEarcupGlow: THREE.Mesh | null;
+    topLip: THREE.Mesh | null;
+    bottomLip: THREE.Mesh | null;
+    leftEye: THREE.Group | null;
+    rightEye: THREE.Group | null;
+    leftEyelid: THREE.Mesh | null;
+    rightEyelid: THREE.Mesh | null;
+    hairBun: THREE.Mesh | null;
+    leftEarring: THREE.Mesh | null;
+    rightEarring: THREE.Mesh | null;
   }>({
     headGroup: null,
-    mouth: null,
+    topLip: null,
+    bottomLip: null,
     leftEye: null,
     rightEye: null,
-    statusLight: null,
-    leftEarcupGlow: null,
-    rightEarcupGlow: null,
+    leftEyelid: null,
+    rightEyelid: null,
+    hairBun: null,
+    leftEarring: null,
+    rightEarring: null,
   });
 
   // State values that can change inside the animation frame
@@ -41,7 +47,7 @@ export default function CoachAvatar({
     mouse: new THREE.Vector2(),
     targetMouse: new THREE.Vector2(),
     blinkTimer: 0,
-    blinkDuration: 0.12,
+    blinkDuration: 0.15,
     isBlinking: false,
   });
 
@@ -57,7 +63,6 @@ export default function CoachAvatar({
     const handleMouseMove = (event: MouseEvent) => {
       if (!mountRef.current) return;
       const rect = mountRef.current.getBoundingClientRect();
-      // Normalize mouse coordinates (-1 to +1)
       const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       // Clamp to screen limits to keep character gazing forward naturally
@@ -80,13 +85,13 @@ export default function CoachAvatar({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // 1. Scene
+    // 1. Scene setup
     const scene = new THREE.Scene();
     scene.background = null; // Transparent background to blend into the web page's smooth gradients
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 0.2, 3.2);
+    // 2. Camera setup - tight portrait lens
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 0.15, 2.4);
 
     // 3. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -95,192 +100,288 @@ export default function CoachAvatar({
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // 4. Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+    // 4. Studio Lighting for realistic skin glow
+    const ambientLight = new THREE.AmbientLight(0xfff3eb, 0.65);
     scene.add(ambientLight);
 
-    // Main studio light (creates elegant highlights)
-    const dirLight1 = new THREE.DirectionalLight(0xf0f7ff, 1.2);
-    dirLight1.position.set(2, 4, 3);
-    dirLight1.castShadow = true;
-    scene.add(dirLight1);
+    // Main studio key light (creates elegant highlights)
+    const keyLight = new THREE.DirectionalLight(0xfffaec, 1.4);
+    keyLight.position.set(1.5, 2, 2.5);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
 
-    // Soft colored accent light (blue/cyan) from the opposite side
-    const dirLight2 = new THREE.DirectionalLight(0x4488ff, 1.5);
-    dirLight2.position.set(-3, -1, 2);
-    scene.add(dirLight2);
+    // Soft warm fill light
+    const fillLight = new THREE.DirectionalLight(0xffedd5, 0.7);
+    fillLight.position.set(-2, -0.5, 1.5);
+    scene.add(fillLight);
 
-    // Subtle edge back light for futuristic rim-glow
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    rimLight.position.set(0, 2, -3);
-    scene.add(rimLight);
+    // Blue/cyan secondary ambient back key
+    const backRimLight = new THREE.DirectionalLight(0xdbeafe, 1.0);
+    backRimLight.position.set(0, 1.5, -2);
+    scene.add(backRimLight);
 
-    // 5. Creating a High-Quality Robot/Humanoid Coach Avatar!
+    // 5. Creating a Stunning Humanoid Female AI Tutor Avatar (Serena!)
     const avatarGroup = new THREE.Group();
-    avatarGroup.position.set(0, -0.65, 0);
+    avatarGroup.position.set(0, -0.6, 0);
     scene.add(avatarGroup);
 
-    // Materials helper
-    const sleekWhiteMetal = new THREE.MeshStandardMaterial({
-      color: 0xf3f4f6,
-      roughness: 0.15,
-      metalness: 0.85,
+    // Beautiful realistic color materials
+    const skinMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfdbca5, // Beautiful soft beachy shell pink skin tone
+      roughness: 0.55,
+      metalness: 0.02,
     });
 
-    const softNavyCore = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.4,
-      metalness: 0.2,
+    const hairMaterial = new THREE.MeshStandardMaterial({
+      color: 0x241812, // Gorgeous rich brunette hair
+      roughness: 0.8,
+      metalness: 0.05,
     });
 
-    const neonBlueGlow = new THREE.MeshStandardMaterial({
-      color: 0x00d2ff,
-      emissive: 0x00a2ff,
-      emissiveIntensity: 1.5,
+    const clothingBlue = new THREE.MeshStandardMaterial({
+      color: 0x1d4ed8, // Modern vivid royal blue tunic
+      roughness: 0.6,
+      metalness: 0.1,
+    });
+
+    const clothingWhite = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc, // Pristine white inner top collar
+      roughness: 0.5,
+    });
+
+    const eyeWhiteMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
       roughness: 0.1,
     });
 
-    const futuristicGoldAccent = new THREE.MeshStandardMaterial({
-      color: 0xeab308,
+    const irisMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2563eb, // Rich brilliant blue hazel sapphire iris
       roughness: 0.2,
+      metalness: 0.35,
+    });
+
+    const pupilMaterial = new THREE.MeshStandardMaterial({
+      color: 0x0c0f17, // Natural dark pupils
+      roughness: 0.05,
+    });
+
+    const makeupCheekMaterial = new THREE.MeshBasicMaterial({
+      color: 0xf43f5e, // Rosy peach blush
+      transparent: true,
+      opacity: 0.25,
+    });
+
+    const lipMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfa5272, // Stylish beautiful coral rose lips
+      roughness: 0.22,
+    });
+
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b, // Elegant gold earrings
+      roughness: 0.18,
       metalness: 0.9,
     });
 
-    const standardDarkGlass = new THREE.MeshStandardMaterial({
-      color: 0x090d16,
-      roughness: 0.1,
-      metalness: 0.9,
-    });
-
-    // A. Torso / Neck Base
-    const torsoGeo = new THREE.CylinderGeometry(0.35, 0.5, 0.8, 32);
-    const torsoMesh = new THREE.Mesh(torsoGeo, softNavyCore);
-    torsoMesh.position.set(0, 0.2, 0);
-    avatarGroup.add(torsoMesh);
-
-    // Tech lines on the body
-    const badgeGeo = new THREE.BoxGeometry(0.25, 0.12, 0.05);
-    const badgeMesh = new THREE.Mesh(badgeGeo, coreStatusLightMaterial(0x00d2ff));
-    badgeMesh.position.set(0, 0.35, 0.34);
-    avatarGroup.add(badgeMesh);
-
-    // Neck joint cylindrical connecting rod
-    const neckGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.25, 16);
-    const neckMesh = new THREE.Mesh(neckGeo, sleekWhiteMetal);
-    neckMesh.position.set(0, 0.65, 0);
+    // A. Elegant Shoulders & Neck
+    const neckGeo = new THREE.CylinderGeometry(0.1, 0.115, 0.22, 16);
+    const neckMesh = new THREE.Mesh(neckGeo, skinMaterial);
+    neckMesh.position.set(0, 0.5, 0);
     avatarGroup.add(neckMesh);
 
-    // Status collar disk
-    const collarGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.05, 16);
-    const collarMesh = new THREE.Mesh(collarGeo, futuristicGoldAccent);
-    collarMesh.position.set(0, 0.58, 0);
+    // Elegant Tunic Shoulders
+    const collarGeo = new THREE.CylinderGeometry(0.24, 0.44, 0.45, 32);
+    const collarMesh = new THREE.Mesh(collarGeo, clothingWhite);
+    collarMesh.position.set(0, 0.22, 0);
     avatarGroup.add(collarMesh);
 
-    // B. Head Group (so we can rotate it together and perform gaze tracking)
+    const shouldersGeo = new THREE.CylinderGeometry(0.26, 0.47, 0.4, 32);
+    const shouldersMesh = new THREE.Mesh(shouldersGeo, clothingBlue);
+    shouldersMesh.position.set(0, 0.18, 0);
+    shouldersMesh.scale.set(1.4, 1, 0.8); // Natural shoulder width proportion
+    avatarGroup.add(shouldersMesh);
+
+    // B. Head Group (Gaze Tracking & head sway)
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.95, 0);
+    headGroup.position.set(0, 0.76, 0.02);
     avatarGroup.add(headGroup);
     meshesRef.current.headGroup = headGroup;
 
-    // Head Base: sleek humanoid stylized face capsule/sphere
-    const skullGeo = new THREE.SphereGeometry(0.38, 32, 32);
-    // Stretch vertically for natural cranium proportions
-    skullGeo.scale(1, 1.15, 0.95);
-    const skullMesh = new THREE.Mesh(skullGeo, sleekWhiteMetal);
+    // Face/Skull base structure
+    const skullGeo = new THREE.SphereGeometry(0.33, 32, 32);
+    skullGeo.scale(1, 1.25, 0.92); // Elegant oval feminine face shape
+    const skullMesh = new THREE.Mesh(skullGeo, skinMaterial);
+    // Face tilts very slightly forward naturally
+    skullMesh.position.set(0, 0, 0);
     headGroup.add(skullMesh);
 
-    // Side headphone bands
-    const headbandGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 24, 1, true);
-    headbandGeo.rotateZ(Math.PI / 2);
-    headbandGeo.scale(1, 1, 1.1);
-    const headband = new THREE.Mesh(headbandGeo, softNavyCore);
-    headbackAccents(headband);
-    headGroup.add(headband);
+    // Soft Cheek Blush Highlights (spheres intersecting slightly)
+    const leftBlushGeo = new THREE.SphereGeometry(0.08, 16, 16);
+    leftBlushGeo.scale(1, 0.8, 0.4);
+    const leftBlush = new THREE.Mesh(leftBlushGeo, makeupCheekMaterial);
+    leftBlush.position.set(-0.16, -0.06, 0.24);
+    headGroup.add(leftBlush);
 
-    // Earcup Left
-    const earcupLeftGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.08, 16);
-    earcupLeftGeo.rotateZ(Math.PI / 2);
-    const earcupLeft = new THREE.Mesh(earcupLeftGeo, futuristicGoldAccent);
-    earcupLeft.position.set(-0.39, 0, 0);
-    headGroup.add(earcupLeft);
+    const rightBlushGeo = new THREE.SphereGeometry(0.08, 16, 16);
+    rightBlushGeo.scale(1, 0.8, 0.4);
+    const rightBlush = new THREE.Mesh(rightBlushGeo, makeupCheekMaterial);
+    rightBlush.position.set(0.16, -0.06, 0.24);
+    headGroup.add(rightBlush);
 
-    const leftGlowGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.03, 16);
-    leftGlowGeo.rotateZ(Math.PI / 2);
-    const leftGlow = new THREE.Mesh(leftGlowGeo, neonBlueGlow);
-    leftGlow.position.set(-0.44, 0, 0);
-    headGroup.add(leftGlow);
-    meshesRef.current.leftEarcupGlow = leftGlow;
+    // C. Natural Feminine Eye Assemblies (Left & Right)
+    const eyeSocketGeo = new THREE.SphereGeometry(0.05, 16, 16);
+    eyeSocketGeo.scale(1, 0.9, 0.55);
 
-    // Earcup Right
-    const earcupRightGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.08, 16);
-    earcupRightGeo.rotateZ(Math.PI / 2);
-    const earcupRight = new THREE.Mesh(earcupRightGeo, futuristicGoldAccent);
-    earcupRight.position.set(0.39, 0, 0);
-    headGroup.add(earcupRight);
+    // Left Eye Socket Group
+    const leftEyeGroup = new THREE.Group();
+    leftEyeGroup.position.set(-0.11, 0.06, 0.26);
+    headGroup.add(leftEyeGroup);
+    meshesRef.current.leftEye = leftEyeGroup;
 
-    const rightGlowGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.03, 16);
-    rightGlowGeo.rotateZ(Math.PI / 2);
-    const rightGlow = new THREE.Mesh(rightGlowGeo, neonBlueGlow);
-    rightGlow.position.set(0.44, 0, 0);
-    headGroup.add(rightGlow);
-    meshesRef.current.rightEarcupGlow = rightGlow;
+    const leftGlobe = new THREE.Mesh(eyeSocketGeo, eyeWhiteMaterial);
+    leftEyeGroup.add(leftGlobe);
 
-    // C. Face visor plate (gives the elegant humanoid robot character aesthetic)
-    const visorGeo = new THREE.SphereGeometry(0.32, 16, 16, 0, Math.PI * 2, 0.3, Math.PI * 0.4);
-    visorGeo.scale(1, 0.8, 1.05);
-    const visorMesh = new THREE.Mesh(visorGeo, standardDarkGlass);
-    visorMesh.position.set(0, 0.05, 0.06);
-    headGroup.add(visorMesh);
+    const leftIrisGeo = new THREE.CylinderGeometry(0.024, 0.024, 0.015, 16);
+    leftIrisGeo.rotateX(Math.PI / 2);
+    const leftIris = new THREE.Mesh(leftIrisGeo, irisMaterial);
+    leftIris.position.set(0, 0, 0.022);
+    leftEyeGroup.add(leftIris);
 
-    // D. Friendly cybernetic glowing blue eyes
-    const eyeGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.02, 16);
-    eyeGeo.rotateX(Math.PI / 2);
+    const leftPupilGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.017, 16);
+    leftPupilGeo.rotateX(Math.PI / 2);
+    const leftPupil = new THREE.Mesh(leftPupilGeo, pupilMaterial);
+    leftPupil.position.set(0, 0, 0.024);
+    leftEyeGroup.add(leftPupil);
 
-    const leftEye = new THREE.Mesh(eyeGeo, neonBlueGlow);
-    leftEye.position.set(-0.13, 0.08, 0.35);
-    headGroup.add(leftEye);
-    meshesRef.current.leftEye = leftEye;
+    // Right Eye Socket Group
+    const rightEyeGroup = new THREE.Group();
+    rightEyeGroup.position.set(0.11, 0.06, 0.26);
+    headGroup.add(rightEyeGroup);
+    meshesRef.current.rightEye = rightEyeGroup;
 
-    const rightEye = new THREE.Mesh(eyeGeo, neonBlueGlow);
-    rightEye.position.set(0.13, 0.08, 0.35);
-    headGroup.add(rightEye);
-    meshesRef.current.rightEye = rightEye;
+    const rightGlobe = new THREE.Mesh(eyeSocketGeo, eyeWhiteMaterial);
+    rightEyeGroup.add(rightGlobe);
 
-    // Glowing friendly eyebrows for expressive tutor moods
-    const browGeo = new THREE.BoxGeometry(0.08, 0.015, 0.01);
-    const leftBrow = new THREE.Mesh(browGeo, softNavyCore);
-    leftBrow.position.set(-0.13, 0.16, 0.35);
-    leftBrow.rotation.z = 0.06;
+    const rightIrisGeo = new THREE.CylinderGeometry(0.024, 0.024, 0.015, 16);
+    rightIrisGeo.rotateX(Math.PI / 2);
+    const rightIris = new THREE.Mesh(rightIrisGeo, irisMaterial);
+    rightIris.position.set(0, 0, 0.022);
+    rightEyeGroup.add(rightIris);
+
+    const rightPupilGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.017, 16);
+    rightPupilGeo.rotateX(Math.PI / 2);
+    const rightPupil = new THREE.Mesh(rightPupilGeo, pupilMaterial);
+    rightPupil.position.set(0, 0, 0.024);
+    rightEyeGroup.add(rightPupil);
+
+    // D. Soft Eyelids for natural Blinking
+    const leftEyelidGeo = new THREE.SphereGeometry(0.052, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+    leftEyelidGeo.rotateX(-Math.PI / 2);
+    const leftEyelid = new THREE.Mesh(leftEyelidGeo, skinMaterial);
+    leftEyelid.position.set(-0.11, 0.075, 0.265);
+    leftEyelid.scale.set(1.05, 0.1, 1.05); // Closed state changes scaling
+    headGroup.add(leftEyelid);
+    meshesRef.current.leftEyelid = leftEyelid;
+
+    const rightEyelid = new THREE.Mesh(leftEyelidGeo, skinMaterial);
+    rightEyelid.position.set(0.11, 0.075, 0.265);
+    rightEyelid.scale.set(1.05, 0.1, 1.05);
+    headGroup.add(rightEyelid);
+    meshesRef.current.rightEyelid = rightEyelid;
+
+    // E. Elegant Arched Eyebrows
+    const browGeo = new THREE.BoxGeometry(0.09, 0.012, 0.01);
+    const leftBrow = new THREE.Mesh(browGeo, hairMaterial);
+    leftBrow.position.set(-0.11, 0.14, 0.29);
+    leftBrow.rotation.z = -0.09;
     headGroup.add(leftBrow);
 
-    const rightBrow = new THREE.Mesh(browGeo, softNavyCore);
-    rightBrow.position.set(0.13, 0.16, 0.35);
-    rightBrow.rotation.z = -0.06;
+    const rightBrow = new THREE.Mesh(browGeo, hairMaterial);
+    rightBrow.position.set(0.11, 0.14, 0.29);
+    rightBrow.rotation.z = 0.09;
     headGroup.add(rightBrow);
 
-    // E. Mouth (a segmented capsule bar representing speech lines - PERFECT for mouth scale lipsync animations!)
-    const mouthGeo = new THREE.BoxGeometry(0.15, 0.018, 0.03);
-    const mouthMesh = new THREE.Mesh(mouthGeo, neonBlueGlow);
-    mouthMesh.position.set(0, -0.15, 0.34);
-    headGroup.add(mouthMesh);
-    meshesRef.current.mouth = mouthMesh;
+    // F. Cute Natural Female Nose
+    const noseGeo = new THREE.ConeGeometry(0.035, 0.09, 4);
+    noseGeo.rotateX(-0.1); // natural nose bridge tilt
+    const noseMesh = new THREE.Mesh(noseGeo, skinMaterial);
+    noseMesh.position.set(0, -0.02, 0.315);
+    noseMesh.scale.set(1, 1, 0.5);
+    headGroup.add(noseMesh);
 
-    // Helper functions
-    function coreStatusLightMaterial(colorVal: number) {
-      return new THREE.MeshStandardMaterial({
-        color: colorVal,
-        emissive: colorVal,
-        emissiveIntensity: 1.0,
-      });
-    }
+    // G. Lip-Synced Humanoid Soft Lips (Top & Bottom parted during speaking!)
+    const lipTopGeo = new THREE.SphereGeometry(0.05, 16, 8);
+    lipTopGeo.scale(1.4, 0.3, 0.4);
+    const topLip = new THREE.Mesh(lipTopGeo, lipMaterial);
+    topLip.position.set(0, -0.13, 0.3);
+    headGroup.add(topLip);
+    meshesRef.current.topLip = topLip;
 
-    function headbackAccents(band: THREE.Mesh) {
-      band.position.set(0, 0, -0.05);
-    }
+    const lipBottomGeo = new THREE.SphereGeometry(0.045, 16, 8);
+    lipBottomGeo.scale(1.3, 0.36, 0.45);
+    const bottomLip = new THREE.Mesh(lipBottomGeo, lipMaterial);
+    bottomLip.position.set(0, -0.155, 0.295);
+    headGroup.add(bottomLip);
+    meshesRef.current.bottomLip = bottomLip;
 
-    // 6. Animation clock
+    // H. Beautiful Styled Hair (Elegant rich brunette up-bun with side curls!)
+    const hairCapGeo = new THREE.SphereGeometry(0.355, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.72);
+    hairCapGeo.scale(1, 1.05, 1.03);
+    const hairCap = new THREE.Mesh(hairCapGeo, hairMaterial);
+    hairCap.position.set(0, 0.1, -0.01);
+    headGroup.add(hairCap);
+
+    // Top Sweeping Bangs - framing her forehead beautifully!
+    const hairBangLGeo = new THREE.SphereGeometry(0.14, 16, 16);
+    hairBangLGeo.scale(1.4, 0.5, 0.6);
+    const hairBangL = new THREE.Mesh(hairBangLGeo, hairMaterial);
+    hairBangL.position.set(-0.13, 0.22, 0.22);
+    hairBangL.rotation.set(0.2, 0.1, -0.32);
+    headGroup.add(hairBangL);
+
+    const hairBangRGeo = new THREE.SphereGeometry(0.14, 16, 16);
+    hairBangRGeo.scale(1.4, 0.5, 0.6);
+    const hairBangR = new THREE.Mesh(hairBangRGeo, hairMaterial);
+    hairBangR.position.set(0.13, 0.22, 0.22);
+    hairBangR.rotation.set(0.2, -0.1, 0.32);
+    headGroup.add(hairBangR);
+
+    // Side Curls falling near shoulders
+    const curlLGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.4, 16);
+    const curlL = new THREE.Mesh(curlLGeo, hairMaterial);
+    curlL.position.set(-0.29, -0.1, 0.12);
+    curlL.rotation.z = 0.12;
+    headGroup.add(curlL);
+
+    const curlRGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.4, 16);
+    const curlR = new THREE.Mesh(curlRGeo, hairMaterial);
+    curlR.position.set(0.29, -0.1, 0.12);
+    curlR.rotation.z = -0.12;
+    headGroup.add(curlR);
+
+    // Elegant Hair Bun at the back for a classy teacher vibe!
+    const bunGeo = new THREE.SphereGeometry(0.15, 24, 24);
+    bunGeo.scale(1, 1, 0.8);
+    const hairBun = new THREE.Mesh(bunGeo, hairMaterial);
+    hairBun.position.set(0, 0.28, -0.25);
+    headGroup.add(hairBun);
+    meshesRef.current.hairBun = hairBun;
+
+    // I. Elegant Gold Earrings
+    const ringGeo = new THREE.TorusGeometry(0.04, 0.01, 8, 24);
+    const earringL = new THREE.Mesh(ringGeo, goldMaterial);
+    earringL.position.set(-0.31, -0.1, 0.06);
+    earringL.rotation.y = Math.PI / 2;
+    headGroup.add(earringL);
+    meshesRef.current.leftEarring = earringL;
+
+    const earringR = new THREE.Mesh(ringGeo, goldMaterial);
+    earringR.position.set(0.31, -0.1, 0.06);
+    earringR.rotation.y = Math.PI / 2;
+    headGroup.add(earringR);
+    meshesRef.current.rightEarring = earringR;
+
+    // 6. Animation ticker clock
     const clock = new THREE.Clock();
-
     let animationFrameId: number;
 
     const animate = () => {
@@ -289,108 +390,99 @@ export default function CoachAvatar({
       const elapsedTime = clock.getElapsedTime();
       const state = animatedStateRef.current;
 
-      // Subtle Idle breathing and oscillation of the entire humanoid character
-      const breathing = Math.sin(elapsedTime * 2.2) * 0.015;
-      avatarGroup.position.y = -0.65 + breathing;
-      
-      // Gentle head swaying
-      if (headGroup) {
-        headGroup.rotation.z = Math.sin(elapsedTime * 1.1) * 0.012;
-        headGroup.rotation.y = Math.cos(elapsedTime * 0.7) * 0.02;
-        
-        // E. Smooth Eye/Gaze Tracking of the User mouse
-        // Gently lerp current mouse target vector for laggy/natural flesh focus
-        state.mouse.x = THREE.MathUtils.lerp(state.mouse.x, state.targetMouse.x, 0.08);
-        state.mouse.y = THREE.MathUtils.lerp(state.mouse.y, state.targetMouse.y, 0.08);
+      // Subtle breath flow
+      const breathing = Math.sin(elapsedTime * 1.8) * 0.008;
+      avatarGroup.position.y = -0.6 + breathing;
+      avatarGroup.position.x = Math.sin(elapsedTime * 0.6) * 0.005;
 
-        // Tilt the head toward user's gaze target
-        headGroup.rotation.y += state.mouse.x * 0.32;
-        headGroup.rotation.x = state.mouse.y * 0.22;
+      // Gaze/Mouse tracking
+      state.mouse.x = THREE.MathUtils.lerp(state.mouse.x, state.targetMouse.x, 0.065);
+      state.mouse.y = THREE.MathUtils.lerp(state.mouse.y, state.targetMouse.y, 0.065);
+
+      if (headGroup) {
+        // Soft head swaying
+        headGroup.rotation.z = Math.sin(elapsedTime * 0.9) * 0.015;
+        // Tilt head to look towards mouse cursor
+        headGroup.rotation.y = state.mouse.x * 0.35;
+        headGroup.rotation.x = state.mouse.y * 0.18 + 0.04; // natural forward gaze offset
       }
 
-      // F. Smooth Blinking Simulation
+      // Eye movements matching head group with subtle offsets to feel extremely lifelike
+      if (leftEyeGroup && rightEyeGroup) {
+        leftEyeGroup.rotation.y = state.mouse.x * 0.15;
+        leftEyeGroup.rotation.x = state.mouse.y * 0.1;
+
+        rightEyeGroup.rotation.y = state.mouse.x * 0.15;
+        rightEyeGroup.rotation.x = state.mouse.y * 0.1;
+      }
+
+      // Blinking simulator
       if (state.isBlinking) {
-        state.blinkTimer += clock.getDelta(); // delta
+        state.blinkTimer += clock.getDelta();
         const progress = state.blinkTimer / state.blinkDuration;
+
         if (progress >= 1.0) {
           state.isBlinking = false;
           state.blinkTimer = 0;
-          if (meshesRef.current.leftEye) meshesRef.current.leftEye.scale.y = 1;
-          if (meshesRef.current.rightEye) meshesRef.current.rightEye.scale.y = 1;
+          if (leftEyelid) leftEyelid.scale.y = 0.1;
+          if (rightEyelid) rightEyelid.scale.y = 0.1;
         } else {
-          // Half closed scale
-          const scale = progress < 0.5 ? 1 - (progress * 2) : (progress - 0.5) * 2;
-          const eyeScale = Math.max(0.08, scale);
-          if (meshesRef.current.leftEye) meshesRef.current.leftEye.scale.y = eyeScale;
-          if (meshesRef.current.rightEye) meshesRef.current.rightEye.scale.y = eyeScale;
+          // Half closed scale cycle
+          const scaleCurve = progress < 0.5 ? 0.1 + (progress * 2 * 0.9) : 1.0 - ((progress - 0.5) * 2 * 0.9);
+          const lidThicknessY = Math.min(1.0, Math.max(0.1, scaleCurve));
+          if (leftEyelid) leftEyelid.scale.y = lidThicknessY;
+          if (rightEyelid) rightEyelid.scale.y = lidThicknessY;
         }
       } else {
-        // Randomly trigger blink every 3-5 seconds
-        if (Math.random() < 0.007) {
+        // Idle eyelids resting open slightly (0.1 Y scale is fully retracted open)
+        if (leftEyelid) leftEyelid.scale.y = 0.1;
+        if (rightEyelid) rightEyelid.scale.y = 0.1;
+
+        // Random trigger to blink (about once every 3-4 seconds)
+        if (Math.random() < 0.006) {
           state.isBlinking = true;
           state.blinkTimer = 0;
         }
       }
 
-      // G. Lip-Sync & Speaking Animation Loop
-      if (meshesRef.current.mouth) {
+      // Speech Lip Sync dynamic jaw/lip splitting!
+      if (topLip && bottomLip) {
         if (state.isSpeaking) {
-          // Dynamic phonetic animation combined using multi-frequency oscillators
-          const syllableShape = Math.abs(
-            Math.sin(elapsedTime * 18) * Math.cos(elapsedTime * 8) + 
-            Math.sin(elapsedTime * 5.5) * 0.4
+          // Speak phonetic vibration oscillators
+          const wordOpening = Math.abs(
+            Math.sin(elapsedTime * 15) * Math.cos(elapsedTime * 7) + 
+            Math.sin(elapsedTime * 4.5) * 0.35
           );
-          // Scale vertical height of the neon speaker mouth representing speaking state
-          meshesRef.current.mouth.scale.y = 1.0 + syllableShape * 4.5;
-          meshesRef.current.mouth.scale.x = 0.95 + Math.sin(elapsedTime * 11) * 0.15;
-          
-          // Boost glowing intensity of the eyes & headset during speech
-          if (meshesRef.current.leftEye) (meshesRef.current.leftEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 2.0 + Math.sin(elapsedTime * 20) * 0.3;
-          if (meshesRef.current.rightEye) (meshesRef.current.rightEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 2.0 + Math.sin(elapsedTime * 20) * 0.3;
+
+          // Top Lip slides slightly up
+          topLip.position.y = -0.13 + wordOpening * 0.018;
+          // Bottom Lip slides down
+          bottomLip.position.y = -0.155 - wordOpening * 0.038;
+          // Narrow width slightly on phonetic vowels
+          topLip.scale.x = 1.4 - wordOpening * 0.1;
+          bottomLip.scale.x = 1.3 - wordOpening * 0.1;
         } else if (state.isProcessing) {
-          // Let mouth stay as a small thinking dot pulsing
-          meshesRef.current.mouth.scale.y = 0.8;
-          meshesRef.current.mouth.scale.x = 0.3 + Math.abs(Math.sin(elapsedTime * 8) * 0.4);
-          
-          if (meshesRef.current.leftEye) (meshesRef.current.leftEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.0;
-          if (meshesRef.current.rightEye) (meshesRef.current.rightEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.0;
+          // Gentle wiggle thinking lips
+          topLip.position.y = -0.13;
+          bottomLip.position.y = -0.155 + Math.sin(elapsedTime * 12) * 0.002;
+          topLip.scale.x = 1.35;
+          bottomLip.scale.x = 1.25;
         } else {
-          // Restore mouth back to normal passive line
-          meshesRef.current.mouth.scale.y = THREE.MathUtils.lerp(meshesRef.current.mouth.scale.y, 1.0, 0.2);
-          meshesRef.current.mouth.scale.x = THREE.MathUtils.lerp(meshesRef.current.mouth.scale.x, 1.0, 0.2);
-          
-          if (meshesRef.current.leftEye) (meshesRef.current.leftEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.2;
-          if (meshesRef.current.rightEye) (meshesRef.current.rightEye.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.2;
+          // Restore quiet serene resting lips
+          topLip.position.y = THREE.MathUtils.lerp(topLip.position.y, -0.13, 0.15);
+          bottomLip.position.y = THREE.MathUtils.lerp(bottomLip.position.y, -0.155, 0.15);
+          topLip.scale.x = THREE.MathUtils.lerp(topLip.scale.x, 1.4, 0.15);
+          bottomLip.scale.x = THREE.MathUtils.lerp(bottomLip.scale.x, 1.3, 0.15);
         }
       }
 
-      // H. Emissive color updates during user dictation / speech listening
-      if (meshesRef.current.leftEarcupGlow && meshesRef.current.rightEarcupGlow) {
-        if (state.isListening) {
-          // Change glows to warm green pulse showing Cody is recording/listening
-          const pulse = 1.5 + Math.sin(elapsedTime * 12) * 0.5;
-          const greenHex = new THREE.Color(0x22c55e);
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissive = greenHex;
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissive = greenHex;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
-        } else if (state.isProcessing) {
-          // Yellow pulsing for processing
-          const pulse = 1.2 + Math.sin(elapsedTime * 15) * 0.4;
-          const goldHex = new THREE.Color(0xeab308);
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissive = goldHex;
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissive = goldHex;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
-        } else {
-          // Classic Neon Blue static-glow when waiting
-          const blueHex = new THREE.Color(0x00d2ff);
-          const baseEmIntensity = 1.3 + Math.sin(elapsedTime * 1.5) * 0.2;
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissive = blueHex;
-          (meshesRef.current.leftEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = baseEmIntensity;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissive = blueHex;
-          (meshesRef.current.rightEarcupGlow.material as THREE.MeshStandardMaterial).emissiveIntensity = baseEmIntensity;
-        }
+      // Elegant hair / earring physics wiggle
+      if (hairBun) {
+        hairBun.rotation.x = Math.sin(elapsedTime * 2.2) * 0.04;
+      }
+      if (earringL && earringR) {
+        earringL.rotation.z = Math.sin(elapsedTime * 4) * 0.08;
+        earringR.rotation.z = Math.cos(elapsedTime * 4) * 0.08;
       }
 
       renderer.render(scene, camera);
@@ -398,7 +490,7 @@ export default function CoachAvatar({
 
     animate();
 
-    // Responsive Canvas Resizing behavior
+    // Canvas Resize observer handler
     const handleResize = () => {
       if (!container) return;
       const w = container.clientWidth;
@@ -414,69 +506,69 @@ export default function CoachAvatar({
     });
     resizeObserver.observe(container);
 
-    // Clean up ThreeJS scenes to prevent GPU leaks
+    // cleanup webgl scenes to avoid web memory leak
     return () => {
       resizeObserver.disconnect();
       cancelAnimationFrame(animationFrameId);
       container.removeChild(renderer.domElement);
       renderer.dispose();
-      
-      // Clear geometries & material leaks
-      torsoGeo.dispose();
+
       neckGeo.dispose();
       collarGeo.dispose();
+      shouldersGeo.dispose();
       skullGeo.dispose();
-      headbandGeo.dispose();
-      earcupLeftGeo.dispose();
-      earcupRightGeo.dispose();
-      leftGlowGeo.dispose();
-      rightGlowGeo.dispose();
-      visorGeo.dispose();
-      eyeGeo.dispose();
+      leftBlushGeo.dispose();
+      rightBlushGeo.dispose();
+      eyeSocketGeo.dispose();
+      leftIrisGeo.dispose();
+      leftPupilGeo.dispose();
+      rightIrisGeo.dispose();
+      rightPupilGeo.dispose();
+      leftEyelidGeo.dispose();
       browGeo.dispose();
-      mouthGeo.dispose();
-      badgeGeo.dispose();
+      noseGeo.dispose();
+      lipTopGeo.dispose();
+      lipBottomGeo.dispose();
+      hairCapGeo.dispose();
+      hairBangLGeo.dispose();
+      hairBangRGeo.dispose();
+      curlLGeo.dispose();
+      curlRGeo.dispose();
+      bunGeo.dispose();
+      ringGeo.dispose();
 
-      sleekWhiteMetal.dispose();
-      softNavyCore.dispose();
-      neonBlueGlow.dispose();
-      futuristicGoldAccent.dispose();
-      standardDarkGlass.dispose();
+      skinMaterial.dispose();
+      hairMaterial.dispose();
+      clothingBlue.dispose();
+      clothingWhite.dispose();
+      eyeWhiteMaterial.dispose();
+      irisMaterial.dispose();
+      pupilMaterial.dispose();
+      makeupCheekMaterial.dispose();
+      lipMaterial.dispose();
+      goldMaterial.dispose();
     };
   }, []);
 
   return (
     <div
       ref={mountRef}
-      id="coach-avatar-canvas-container"
-      className="w-full h-full relative overflow-hidden flex items-center justify-center cursor-pointer"
-      title="Cody tracks your mouse movement!"
+      id="serena-humanoid-avatar-container"
+      className="w-full h-full relative overflow-hidden flex items-center justify-center cursor-pointer select-none bg-radial from-blue-50/50 via-white/80 to-blue-50/20"
+      title="Serena reacts and gazes at your mouse movements!"
     >
-      {/* Decorative cyber backdrop grid pattern using tailwind utility classes */}
-      <div className="absolute inset-0 bg-radial from-slate-900/10 via-slate-900/60 to-slate-950 pointer-events-none rounded-3xl border border-white/5 opacity-80" />
-      
-      {/* Visual floating tags */}
-      <div className="absolute top-4 left-4 flex gap-2 pointer-events-none select-none">
-        <div className={`px-2.5 py-1 text-[10px] font-mono rounded-full border flex items-center gap-1.5 transition-all duration-300 ${
-          isListening 
-            ? "bg-green-500/15 text-green-400 border-green-500/30 font-bold" 
+      {/* Absolute indicator badge */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 bg-white/95 backdrop-blur-md text-[10px] font-bold text-slate-500 rounded-full shadow-xs border border-slate-100 uppercase tracking-widest pointer-events-none select-none">
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          isSpeaking 
+            ? "bg-rose-500 animate-pulse" 
+            : isListening 
+            ? "bg-green-500 animate-ping" 
             : isProcessing 
-            ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-            : isSpeaking
-            ? "bg-sky-500/15 text-sky-400 border-sky-500/30"
-            : "bg-white/5 text-slate-400 border-white/10"
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${
-            isListening 
-              ? "bg-green-400 animate-ping" 
-              : isProcessing 
-              ? "bg-amber-400 animate-pulse"
-              : isSpeaking
-              ? "bg-sky-400"
-              : "bg-slate-400"
-          }`} />
-          {isListening ? "LISTENING" : isProcessing ? "ANALYZING" : isSpeaking ? "TALKING" : "COACH IDLE"}
-        </div>
+            ? "bg-blue-500 animate-spin" 
+            : "bg-slate-300"
+        }`} />
+        {isSpeaking ? "Speaking" : isListening ? "Listening" : isProcessing ? "Thinking" : "Online"}
       </div>
     </div>
   );

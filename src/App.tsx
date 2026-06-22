@@ -17,20 +17,16 @@ import {
   BookOpen,
   ChevronRight,
   Flame,
-  Info,
   Settings,
-  HelpCircle,
   Bookmark,
   Trash2,
-  Plus,
   Calendar,
-  TrendingUp,
   Award,
   Activity,
-  Check,
-  LayoutDashboard,
   MessageSquare,
-  GraduationCap
+  LayoutDashboard,
+  GraduationCap,
+  Sparkle
 } from "lucide-react";
 import { ChatMessage, TeacherState, VocabItem, GrammarErrorItem, SessionRecord } from "./types";
 import CoachAvatar from "./components/CoachAvatar";
@@ -69,9 +65,9 @@ export default function App() {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
-  const [speechRate, setSpeechRate] = useState<number>(0.95);
+  const [speechRate, setSpeechRate] = useState<number>(1.0);
   const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(true); // Dev default is true for easy visual controls
   
   // Custom interactive system indicators
   const [teacherState, setTeacherState] = useState<TeacherState>({
@@ -92,54 +88,78 @@ export default function App() {
     encouragement: string;
   } | null>(null);
 
-  // Progress tracking database states
-  const [activeTab, setActiveTab] = useState<"practice" | "dashboard">("practice");
+  // Nav/Toggle states
+  const [sidebarActiveTab, setSidebarActiveTab] = useState<"coach" | "dashboard" | "vocab">("coach");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [grammarErrors, setGrammarErrors] = useState<GrammarErrorItem[]>([]);
   const [vocabList, setVocabList] = useState<VocabItem[]>([]);
   
-  // Quick-Add Vocabulary form states
+  // Form and search states
   const [showAddVocabForm, setShowAddVocabForm] = useState<boolean>(false);
   const [vocabWordToAdd, setVocabWordToAdd] = useState<string>("");
   const [vocabMeaningToAdd, setVocabMeaningToAdd] = useState<string>("");
   const [vocabSentenceToAdd, setVocabSentenceToAdd] = useState<string>("");
-
-  // Search & filter queries
   const [vocabSearchQuery, setVocabSearchQuery] = useState<string>("");
   const [grammarSearchQuery, setGrammarSearchQuery] = useState<string>("");
-
-  // Status logs
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Synchronize dynamic persistent states with client storage
-  useEffect(() => {
-    try {
-      const savedSessions = localStorage.getItem("cody_sessions");
-      if (savedSessions) setSessions(JSON.parse(savedSessions));
-
-      const savedErrors = localStorage.getItem("cody_grammar_errors");
-      if (savedErrors) setGrammarErrors(JSON.parse(savedErrors));
-
-      const savedVocab = localStorage.getItem("cody_vocab");
-      if (savedVocab) setVocabList(JSON.parse(savedVocab));
-
-      const savedStreak = localStorage.getItem("cody_streak");
-      const savedTotal = localStorage.getItem("cody_total_attempts");
-      const savedCorrect = localStorage.getItem("cody_correct_attempts");
-      
-      if (savedStreak) setStreakCount(parseInt(savedStreak));
-      if (savedTotal) setTotalAttempts(parseInt(savedTotal));
-      if (savedCorrect) setCorrectAttempts(parseInt(savedCorrect));
-    } catch (e) {
-      console.error("Failed to restore progress assets from localStorage:", e);
-    }
-  }, []);
+  // New persistent voice preference states
+  const [accentPreference, setAccentPreference] = useState<"neutral" | "indian" | "british">("neutral");
+  const [genderPreference, setGenderPreference] = useState<"female" | "male">("female");
+  const [speedPreference, setSpeedPreference] = useState<"slow" | "normal" | "fast">("normal");
 
   // Recognition reference & logs scroller
   const recognitionRef = useRef<any>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Setup TTS speech synthesis voice profiles
+  // Synchronize dynamic persistent states with client storage
+  useEffect(() => {
+    try {
+      const savedSessions = localStorage.getItem("serena_sessions");
+      if (savedSessions) setSessions(JSON.parse(savedSessions));
+
+      const savedErrors = localStorage.getItem("serena_grammar_errors");
+      if (savedErrors) setGrammarErrors(JSON.parse(savedErrors));
+
+      const savedVocab = localStorage.getItem("serena_vocab");
+      if (savedVocab) setVocabList(JSON.parse(savedVocab));
+
+      const savedStreak = localStorage.getItem("serena_streak");
+      const savedTotal = localStorage.getItem("serena_total_attempts");
+      const savedCorrect = localStorage.getItem("serena_correct_attempts");
+      
+      if (savedStreak) setStreakCount(parseInt(savedStreak));
+      if (savedTotal) setTotalAttempts(parseInt(savedTotal));
+      if (savedCorrect) setCorrectAttempts(parseInt(savedCorrect));
+
+      // Voice Preferences
+      const savedAccent = localStorage.getItem("serena_accent");
+      if (savedAccent) setAccentPreference(savedAccent as any);
+
+      const savedGender = localStorage.getItem("serena_gender");
+      if (savedGender) setGenderPreference(savedGender as any);
+
+      const savedSpeed = localStorage.getItem("serena_speed");
+      if (savedSpeed) setSpeedPreference(savedSpeed as any);
+    } catch (e) {
+      console.error("Failed to restore progress assets from localStorage:", e);
+    }
+  }, []);
+
+  // Sync preference states back to localstorage
+  useEffect(() => {
+    localStorage.setItem("serena_accent", accentPreference);
+  }, [accentPreference]);
+
+  useEffect(() => {
+    localStorage.setItem("serena_gender", genderPreference);
+  }, [genderPreference]);
+
+  useEffect(() => {
+    localStorage.setItem("serena_speed", speedPreference);
+  }, [speedPreference]);
+
+  // Load synthesized voice profiles into local state
   useEffect(() => {
     const handleVoicesChanged = () => {
       if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -148,13 +168,6 @@ export default function App() {
           v.lang.toLowerCase().startsWith("en")
         );
         setVoices(enVoices);
-
-        const defaultChoice =
-          enVoices.find((v) => v.name.includes("Google US English") || v.name.includes("Samantha")) ||
-          enVoices[0];
-        if (defaultChoice && !selectedVoice) {
-          setSelectedVoice(defaultChoice.name);
-        }
       }
     };
 
@@ -162,7 +175,75 @@ export default function App() {
       window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
       handleVoicesChanged();
     }
-  }, [selectedVoice]);
+  }, []);
+
+  // Automatically find & map the best available system voice based on accent + gender preference
+  useEffect(() => {
+    if (voices.length === 0) return;
+
+    const enVoices = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+
+    // Filter by accent preference (United States, India, Great Britain)
+    let accentFiltered = enVoices;
+    if (accentPreference === "neutral") {
+      accentFiltered = enVoices.filter((v) =>
+        v.lang.toLowerCase().includes("us") || v.lang.toLowerCase().includes("ca")
+      );
+      if (accentFiltered.length === 0) accentFiltered = enVoices;
+    } else if (accentPreference === "indian") {
+      accentFiltered = enVoices.filter((v) => v.lang.toLowerCase().includes("in"));
+      if (accentFiltered.length === 0) {
+        accentFiltered = enVoices.filter((v) =>
+          v.lang.toLowerCase().includes("gb") || v.lang.toLowerCase().includes("uk")
+        );
+      }
+    } else if (accentPreference === "british") {
+      accentFiltered = enVoices.filter((v) =>
+        v.lang.toLowerCase().includes("gb") || v.lang.toLowerCase().includes("uk")
+      );
+      if (accentFiltered.length === 0) accentFiltered = enVoices;
+    }
+
+    // Filter by voice gender keyword
+    const femaleKeywords = [
+      "samantha", "zira", "susan", "hazel", "victoria", "karen", "tessa", 
+      "moira", "veena", "heera", "rani", "priya", "fiona", "female", 
+      "elena", "lisa", "serena", "siri", "microsoft zira"
+    ];
+    const maleKeywords = [
+      "david", "george", "mark", "ravi", "heera_male", "male", 
+      "microsoft david", "rishi", "daniel", "peter", "guy", "google uk"
+    ];
+
+    let finalVoice = null;
+    if (genderPreference === "female") {
+      finalVoice = accentFiltered.find((v) =>
+        femaleKeywords.some((keyword) => v.name.toLowerCase().includes(keyword))
+      );
+    } else {
+      finalVoice = accentFiltered.find((v) =>
+        maleKeywords.some((keyword) => v.name.toLowerCase().includes(keyword))
+      );
+    }
+
+    if (!finalVoice) finalVoice = accentFiltered[0]; // Accent fallback
+    if (!finalVoice) finalVoice = enVoices[0]; // Total English fallback
+
+    if (finalVoice) {
+      setSelectedVoice(finalVoice.name);
+    }
+  }, [voices, accentPreference, genderPreference]);
+
+  // Adjust Speeds
+  useEffect(() => {
+    if (speedPreference === "slow") {
+      setSpeechRate(0.75);
+    } else if (speedPreference === "normal") {
+      setSpeechRate(1.0);
+    } else if (speedPreference === "fast") {
+      setSpeechRate(1.25);
+    }
+  }, [speedPreference]);
 
   // Setup Web Speech Recognition hooks
   useEffect(() => {
@@ -226,7 +307,7 @@ export default function App() {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [messages, teacherState.isProcessing]);
+  }, [messages, teacherState.isProcessing, interimTranscript]);
 
   // TTS Voice announcer
   const playVoiceSynthesis = (text: string) => {
@@ -241,7 +322,7 @@ export default function App() {
     }
 
     utterance.rate = speechRate;
-    utterance.pitch = 1.05;
+    utterance.pitch = genderPreference === "female" ? 1.05 : 0.95;
 
     utterance.onstart = () => {
       setTeacherState((p) => ({ ...p, isSpeaking: true }));
@@ -267,7 +348,7 @@ export default function App() {
 
   const toggleSpeechRecognition = () => {
     if (!recognitionRef.current) {
-      setErrorMessage("Speech recognition is not fully supported in your current browser session. We recommend Chrome!");
+      setErrorMessage("Speech recognition is not fully supported in your current browser session. We recommend Google Chrome!");
       return;
     }
 
@@ -362,7 +443,7 @@ export default function App() {
 
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Something went wrong. Make sure you set the Gemini API key.");
+      setErrorMessage(err.message || "Something went wrong. Make sure you set the Gemini API key in Settings.");
     } finally {
       setTeacherState((prev) => ({ ...prev, isProcessing: false }));
     }
@@ -378,9 +459,9 @@ export default function App() {
     setCorrectAttempts(newCorrect);
     setStreakCount(newStreak);
 
-    localStorage.setItem("cody_total_attempts", newTotal.toString());
-    localStorage.setItem("cody_correct_attempts", newCorrect.toString());
-    localStorage.setItem("cody_streak", newStreak.toString());
+    localStorage.setItem("serena_total_attempts", newTotal.toString());
+    localStorage.setItem("serena_correct_attempts", newCorrect.toString());
+    localStorage.setItem("serena_streak", newStreak.toString());
 
     // Grouping practice sessions by day
     const todayStr = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -405,7 +486,7 @@ export default function App() {
           },
         ];
       }
-      localStorage.setItem("cody_sessions", JSON.stringify(updated));
+      localStorage.setItem("serena_sessions", JSON.stringify(updated));
       return updated;
     });
 
@@ -423,7 +504,7 @@ export default function App() {
           savedAt: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
         const updated = [errorItem, ...prev];
-        localStorage.setItem("cody_grammar_errors", JSON.stringify(updated));
+        localStorage.setItem("serena_grammar_errors", JSON.stringify(updated));
         return updated;
       });
     }
@@ -436,8 +517,8 @@ export default function App() {
     const newItem: VocabItem = {
       id: Math.random().toString(),
       word: wordClean,
-      meaning: meaning.trim() || "Custom phrasing item",
-      sentence: sentence.trim() || "Example usage sentence from practices",
+      meaning: meaning.trim() || "Extracted phrase from dialogue",
+      sentence: sentence.trim() || "Example usage sentence from Serena",
       savedAt: new Date().toLocaleDateString(),
     };
 
@@ -446,7 +527,7 @@ export default function App() {
         return prev;
       }
       const updated = [newItem, ...prev];
-      localStorage.setItem("cody_vocab", JSON.stringify(updated));
+      localStorage.setItem("serena_vocab", JSON.stringify(updated));
       return updated;
     });
   };
@@ -454,7 +535,7 @@ export default function App() {
   const handleRemoveFromVocabList = (id: string) => {
     setVocabList((prev) => {
       const updated = prev.filter((v) => v.id !== id);
-      localStorage.setItem("cody_vocab", JSON.stringify(updated));
+      localStorage.setItem("serena_vocab", JSON.stringify(updated));
       return updated;
     });
   };
@@ -462,863 +543,825 @@ export default function App() {
   const handleRemoveGrammarError = (id: string) => {
     setGrammarErrors((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      localStorage.setItem("cody_grammar_errors", JSON.stringify(updated));
+      localStorage.setItem("serena_grammar_errors", JSON.stringify(updated));
       return updated;
     });
   };
 
-  const handleSelectScenario = (promptText: string) => {
-    setUserInput(promptText);
+  const handleSelectScenario = (promptHint: string) => {
+    setUserInput(promptHint);
   };
 
   const handleResetMetrics = () => {
-    setMessages([]);
-    setLastAnalysis(null);
-    setStreakCount(0);
-    setTotalAttempts(0);
-    setCorrectAttempts(0);
-    setSessions([]);
-    setGrammarErrors([]);
-    setVocabList([]);
-    localStorage.removeItem("cody_total_attempts");
-    localStorage.removeItem("cody_correct_attempts");
-    localStorage.removeItem("cody_streak");
-    localStorage.removeItem("cody_sessions");
-    localStorage.removeItem("cody_grammar_errors");
-    localStorage.removeItem("cody_vocab");
+    if (confirm("Are you sure you want to clear your learning history? This will delete all saved vocabulary and grammar errors.")) {
+      setMessages([]);
+      setLastAnalysis(null);
+      setStreakCount(0);
+      setTotalAttempts(0);
+      setCorrectAttempts(0);
+      setSessions([]);
+      setGrammarErrors([]);
+      setVocabList([]);
+      localStorage.removeItem("serena_total_attempts");
+      localStorage.removeItem("serena_correct_attempts");
+      localStorage.removeItem("serena_streak");
+      localStorage.removeItem("serena_sessions");
+      localStorage.removeItem("serena_grammar_errors");
+      localStorage.removeItem("serena_vocab");
+    }
   };
 
   const accuracyPercent = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 100;
 
   return (
-    <div className="h-screen w-screen bg-slate-100 flex items-center justify-center p-0 md:p-4 overflow-hidden">
-      {/* Immersive UI Container Window */}
-      <div className="w-full h-full max-w-[1280px] max-h-[850px] bg-white rounded-none md:rounded-3xl shadow-2xl border-0 md:border-8 border-slate-200 flex flex-col overflow-hidden font-sans">
+    <div className="h-screen w-screen bg-slate-100 flex items-center justify-center p-0 md:p-3 overflow-hidden text-slate-800">
+      {/* Immersive Window Frame */}
+      <div className="w-full h-full max-w-[1380px] max-h-[920px] bg-white rounded-none md:rounded-2xl shadow-xl border-0 md:border-4 border-slate-200/60 flex flex-col overflow-hidden font-sans">
         
-        {/* Header Navigation styled with "Immersive UI" aesthetic */}
-        <header className="h-16 px-6 md:px-8 flex items-center justify-between bg-white border-b border-blue-100 shrink-0 select-none">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-lg">C</span>
+        {/* Upper Header Nav */}
+        <header className="h-14 px-6 md:px-8 flex items-center justify-between bg-white border-b border-slate-100 shrink-0 select-none">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+              <span className="text-white font-black text-sm">S</span>
             </div>
-            <h1 className="text-lg md:text-xl font-display font-bold text-slate-800 tracking-tight">
-              Cody <span className="text-blue-500 font-medium">English Coach</span>
-            </h1>
+            <div>
+              <h1 className="text-sm md:text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
+                Serena <span className="text-blue-500 font-semibold px-1.5 py-0.5 bg-blue-50 rounded text-[10px] tracking-normal">AI English Coach</span>
+              </h1>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 md:gap-6">
+          <div className="flex items-center gap-4">
+            {/* Live Streak indicator */}
+            {streakCount > 0 && (
+              <div className="flex items-center gap-1 bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full text-xs font-bold leading-none">
+                <Flame className="w-3.5 h-3.5 fill-orange-500 animate-pulse text-orange-500" />
+                <span>Streak: {streakCount}</span>
+              </div>
+            )}
+            
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest hidden sm:inline">
-                Gemini AI Active
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xs:inline">
+                Gemini Active
               </span>
             </div>
-            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
             
-            {/* Action buttons */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  showSettings 
-                    ? "bg-blue-50 text-blue-600" 
-                    : "text-slate-500 hover:text-blue-600 hover:bg-slate-50"
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Voice Control</span>
-              </button>
+            <div className="h-5 w-px bg-slate-200"></div>
 
-              <button
-                onClick={handleResetMetrics}
-                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
-                title="Reset session score and logs"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              onClick={() => setIsAudioMuted(!isAudioMuted)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                isAudioMuted 
+                  ? "bg-red-50 text-red-500 hover:bg-red-100" 
+                  : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+              }`}
+              title={isAudioMuted ? "Unmute vocal playback" : "Mute vocal playback"}
+            >
+              {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
           </div>
         </header>
 
-        {/* Primary Screen Area divided as Left (2/3 Avatar) and Right (1/3 Chat panel) */}
+        {/* Primary Screen Area - LARGE CENTRAL CHAT LEFT (2/3) + DASHBOARD & AVATAR RIGHT (1/3) */}
         <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           
-          {/* Left Side: Dynamic Humanoid Agent 3D Viewport with backgrid */}
-          <section className="flex-1 lg:w-2/3 relative bg-gradient-to-br from-blue-55 via-blue-50/30 to-white flex flex-col overflow-hidden">
+          {/* LEFT COLUMN: Large, Central Practice Conversation Workspace (2/3 size) */}
+          <section className="flex-1 lg:w-2/3 flex flex-col bg-slate-50/50 relative overflow-hidden">
             
-            {/* Grid Overlay for 3D depth feel styled from the design document */}
+            {/* Subtle Chat grid background pattern */}
             <div 
-              className="absolute inset-0 opacity-15 pointer-events-none" 
+              className="absolute inset-0 opacity-10 pointer-events-none" 
               style={{ 
-                backgroundImage: "radial-gradient(#3b82f6 1px, transparent 1px)", 
-                backgroundSize: "40px 40px" 
+                backgroundImage: "radial-gradient(#3b82f6 0.75px, transparent 0.75px)", 
+                backgroundSize: "24px 24px" 
               }} 
             />
 
-            {/* Float visual card 1: Accuracy gauge */}
-            <div className="absolute top-6 left-6 p-4 bg-white/90 backdrop-blur-md rounded-2xl border border-blue-100/30 shadow-md z-10 transition-all duration-300">
-              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-0.5">Grammar Accuracy</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-800 font-display">{accuracyPercent}%</span>
-                <span className="text-xs text-slate-400 font-medium">({correctAttempts}/{totalAttempts || 0})</span>
+            {/* Quick Practice Scenarios Tag Drawer (Placed at the top of the chat area) */}
+            <div className="px-5 py-2.5 bg-white border-b border-slate-100 flex items-center gap-3 overflow-x-auto shrink-0 select-none z-10 scrollbar-none">
+              <span className="text-[9px] font-bold bg-slate-100 text-slate-500 uppercase tracking-widest px-2 py-1 rounded whitespace-nowrap flex items-center gap-1">
+                <Compass className="w-3 h-3 text-blue-500" /> Practice Scenarios:
+              </span>
+              <div className="flex gap-2">
+                {PRACTICE_PROMPTS.map((p, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSelectScenario(p.hint)}
+                    className="py-1 px-3 text-xs bg-blue-50/40 hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200/50 hover:border-blue-200 rounded-full transition-all whitespace-nowrap cursor-pointer flex flex-col items-start font-medium"
+                    title={p.description}
+                  >
+                    <span className="text-[9px] font-bold text-blue-500 tracking-tight leading-none mb-0.5">{p.category}</span>
+                    <span className="leading-none">{p.scenario}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Float visual card 2: Streak counter */}
-            {streakCount > 0 && (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="absolute top-6 right-6 p-3 bg-orange-500 text-white rounded-2xl shadow-lg z-10 flex items-center gap-2"
-              >
-                <Flame className="w-5 h-5 animate-bounce" />
-                <div>
-                  <p className="text-[9px] font-mono leading-none text-orange-200 uppercase font-black">Streak Active</p>
-                  <p className="text-sm font-black font-display">{streakCount} in a row!</p>
+            {/* Interactive WhatsApp-Style Chat bubble thread log */}
+            <div 
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-5 md:p-6 space-y-6 flex flex-col relative z-0"
+              id="whatsapp-chat-thread"
+            >
+              {messages.length === 0 ? (
+                // Centered Hello World Greeting Card
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-sm mx-auto my-auto space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-150/45 flex items-center justify-center shadow-xs">
+                    <Sparkles className="w-6 h-6 text-blue-600 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Start Learning with Serena</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Write or speak a complete sentence in English. Serena will analyze your phrasing, spelling, and offer natural corrections immediately!
+                    </p>
+                  </div>
+                  <div className="w-full flex flex-col gap-2 pt-2">
+                    <button 
+                      onClick={() => handleSelectScenario("I want a hot coffee and how much is it?")}
+                      className="w-full py-2 bg-white hover:bg-blue-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-medium transition-all"
+                    >
+                      💡 Try: "I want a hot coffee..."
+                    </button>
+                  </div>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Main Interactive 3D Canvas element wrapper */}
-            <div className="flex-1 w-full min-h-[280px] lg:min-h-0 relative z-0 flex items-center justify-center">
-              <CoachAvatar
-                isSpeaking={teacherState.isSpeaking}
-                isListening={teacherState.isListening}
-                isProcessing={teacherState.isProcessing}
-              />
-            </div>
-
-            {/* Floating state control triggers directly below model */}
-            <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-center justify-center gap-3 z-10">
-              {teacherState.isSpeaking ? (
-                <button
-                  onClick={stopVoiceOnCommand}
-                  className="px-4 py-2 bg-red-500 text-white rounded-full text-xs font-semibold shadow-lg hover:bg-red-600 transition-all active:scale-95 flex items-center gap-1.5 animate-pulse"
-                >
-                  <Square className="w-3 h-3 fill-white" /> Speaking (Click to interrupt)
-                </button>
-              ) : teacherState.isListening ? (
-                <button
-                  onClick={toggleSpeechRecognition}
-                  className="px-5 py-2.5 bg-green-500 text-white rounded-full text-xs font-semibold shadow-lg hover:bg-green-600 transition-all active:scale-95 flex items-center gap-1.5 animate-bounce"
-                >
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" /> Listening (Speak now...)
-                </button>
               ) : (
-                <div className="px-4 py-1.5 bg-white/70 backdrop-blur-md text-slate-500 rounded-full text-xs font-semibold shadow-xs border border-slate-100">
-                  🎙️ Use the microphone below to talk or click scenarios to learn sentences!
-                </div>
-              )}
-            </div>
+                messages.map((item) => {
+                  const isUser = item.role === "user";
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex flex-col ${isUser ? "items-end" : "items-start"} space-y-1.5`}
+                      id={`message-block-${item.id}`}
+                    >
+                      {/* Avatar initials or username badge */}
+                      <span className="text-[9px] font-bold text-slate-400 px-1 font-mono">
+                        {isUser ? "You" : "Serena Coach"}
+                      </span>
 
-            {/* Settings drop drawer container panel */}
-            <AnimatePresence>
-              {showSettings && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="bg-white border-t border-slate-100 p-4 relative z-20 shadow-xl"
-                >
-                  <div className="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tutor Accent:</span>
-                      {voices.length > 0 ? (
-                        <select
-                          value={selectedVoice}
-                          onChange={(e) => {
-                            setSelectedVoice(e.target.value);
-                            stopVoiceOnCommand();
-                          }}
-                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
-                        >
-                          {voices.map((v) => (
-                            <option key={v.name} value={v.name}>
-                              {v.name} ({v.lang})
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs text-slate-400">Loading accents...</span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col justify-center gap-1">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-500 uppercase">Speed Rate:</span>
-                        <span className="font-mono font-bold text-blue-600">{speechRate}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.75"
-                        max="1.25"
-                        step="0.05"
-                        value={speechRate}
-                        onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-start lg:justify-center pt-2">
-                      <button
-                        onClick={() => setIsAudioMuted(!isAudioMuted)}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold ${
-                          isAudioMuted
-                            ? "bg-red-50 text-red-600 border-red-100"
-                            : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                      {/* Message Bubble - Styled cleanly like WhatsApp with modern curves */}
+                      <div
+                        className={`p-4 shadow-3xs max-w-[85%] sm:max-w-[70%] relative ${
+                          isUser
+                            ? "bg-blue-600 text-white rounded-3xl rounded-tr-none text-sm animate-fade-in"
+                            : "bg-white text-slate-800 rounded-3xl rounded-tl-none text-sm border border-slate-100"
                         }`}
                       >
-                        {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                        <span>{isAudioMuted ? "Volume Playback Muted" : "Voice On"}</span>
-                      </button>
+                        <p className="leading-relaxed whitespace-pre-line break-words font-medium">
+                          {item.text}
+                        </p>
+                        
+                        {/* Audio play, pronunciation, and vocabulary bookmarks for Model response */}
+                        {!isUser && item.speechText && (
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-dashed border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => playVoiceSynthesis(item.speechText!)}
+                              className="text-[10px] font-bold py-1 px-2.5 bg-blue-50/50 border border-blue-105 rounded-lg text-blue-600 hover:bg-blue-150/50 flex items-center gap-1 active:scale-95 transition-all shadow-3xs cursor-pointer"
+                              id={`speak-vocal-${item.id}`}
+                            >
+                              <Play className="w-3 h-3 fill-blue-600 text-blue-600" /> Listen Again
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleSaveToVocabList(item.text, "Conversational phrase from Serena", "Extracted from live chat transcript.")}
+                              className="text-[10px] font-bold py-1 px-2 bg-slate-50 border border-slate-200/60 hover:border-blue-200 hover:text-blue-600 rounded-lg text-slate-500 flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                              title="Bookmark vocabulary phrase"
+                              id={`save-vocab-${item.id}`}
+                            >
+                              <Bookmark className="w-3 h-3 text-slate-400" /> Keep Phrasing
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Grammatical evaluations and learning feedback card tied directly underneath the response bubble */}
+                      {!isUser && (
+                        <div className="w-full max-w-[85%] sm:max-w-[70%]">
+                          <div className={`p-3.5 mt-1.5 rounded-2xl text-xs space-y-2.5 ${
+                            item.isCorrect 
+                              ? "bg-emerald-50/60 border border-emerald-100 text-slate-700" 
+                              : "bg-amber-50/75 border border-amber-100/80 text-slate-700"
+                          }`}>
+                            <div className="flex items-center justify-between gap-1.5 border-b pb-1.5 border-slate-200/10">
+                              <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 font-mono">
+                                <Sparkle className={`w-3 h-3 ${item.isCorrect ? "text-emerald-500" : "text-amber-500 text-amber-500"}`} /> 
+                                {item.isCorrect ? "Grammar Check: Perfect" : "Grammar Advice"}
+                              </span>
+                            </div>
+
+                            {!item.isCorrect && item.suggestions && (
+                              <div className="bg-white/95 p-2 rounded-xl border border-amber-100 shadow-3xs space-y-1">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Better Phrase Path:</p>
+                                <p className="text-xs font-bold text-slate-800 select-all leading-tight">
+                                  {item.suggestions}
+                                </p>
+                              </div>
+                            )}
+
+                            {item.corrections && (
+                              <p className="text-xs leading-relaxed text-slate-600">
+                                <span className="font-bold text-slate-700">Guide:</span> {item.corrections}
+                              </p>
+                            )}
+
+                            {item.encouragement && (
+                              <p className="text-[11px] font-medium text-blue-600/90 italic">
+                                &ldquo;{item.encouragement}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </motion.div>
+                  );
+                })
               )}
-            </AnimatePresence>
+
+              {/* Real-time processing loader */}
+              {teacherState.isProcessing && (
+                <div className="flex flex-col items-start space-y-1 animate-pulse">
+                  <span className="text-[9px] font-bold text-slate-400 px-1 font-mono">Serena AI Coach</span>
+                  <div className="bg-white px-4 py-3 rounded-3xl rounded-tl-none border border-slate-100 text-slate-500 text-xs flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                    <span>Evaluating grammatical accuracy...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Error Notifications Panel */}
+            {errorMessage && (
+              <div className="mx-6 my-2 p-3 rounded-xl bg-red-50 border border-red-105 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span className="flex-1">{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage(null)}
+                  className="text-[10px] font-bold text-red-500 px-1 hover:text-red-700 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* LARGE CONVERSATION INPUT ZONE - WHATSAPP STYLE PILL */}
+            <div className="p-4 md:p-5 border-t border-slate-100 bg-white shrink-0 z-10">
+              <div className="relative flex items-center max-w-4xl mx-auto">
+                
+                {/* Interim Voice transcribing feedback bubble floating quietly over inputs */}
+                {interimTranscript && (
+                  <div className="absolute -top-14 left-4 right-4 bg-slate-900 border border-slate-800 text-white px-4 py-2.5 rounded-2xl text-xs font-mono shadow-md flex items-center gap-2 z-10 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    <p className="line-clamp-1 italic text-slate-100">&ldquo;{interimTranscript}&rdquo;</p>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (userInput.trim()) handleSubmitConversation(userInput);
+                  }}
+                  className="w-full relative flex items-center"
+                >
+                  {/* TEXT BOX FOR TYPING ENGLISH SENTENCES */}
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder={
+                      teacherState.isListening
+                        ? "Speak clearly to Serena now..."
+                        : "Type an English sentence to correct..."
+                    }
+                    disabled={teacherState.isListening}
+                    className="w-full pl-6 pr-24 py-3.5 bg-slate-50 border border-slate-200/80 rounded-full focus:outline-none focus:ring-2 focus:focus:ring-blue-500/15 focus:border-blue-500/80 focus:bg-white transition-all text-sm text-slate-800 placeholder-slate-400"
+                    id="user-typed-input"
+                  />
+
+                  {/* ABSOLUTE POSITIONED CONTROL PILLS ON THE RIGHT SIDE OF THE INPUT BOX */}
+                  <div className="absolute right-2 flex items-center gap-1.5">
+                    
+                    {/* MICROPHONE BUTTON SPEAK CONTAINER */}
+                    <button
+                      type="button"
+                      onClick={toggleSpeechRecognition}
+                      className={`p-2 rounded-full transition-all cursor-pointer ${
+                        teacherState.isListening
+                          ? "bg-red-500 text-white animate-pulse shadow-md"
+                          : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      }`}
+                      title={teacherState.isListening ? "Listening - Click to send" : "Microphone: Speak English sentence"}
+                      id="speech-dictation-mic-btn"
+                    >
+                      {teacherState.isListening ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {/* SEND BUTTON TRIGGER */}
+                    <button
+                      type="submit"
+                      disabled={!userInput.trim() || teacherState.isProcessing || teacherState.isListening}
+                      className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
+                      title="Send sentence for analysis"
+                      id="submit-send-msg"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                    
+                  </div>
+                </form>
+
+              </div>
+
+              {/* Tiny auxiliary status line in bar */}
+              <div className="max-w-4xl mx-auto mt-2.5 flex justify-between items-center px-2 text-[10px] text-slate-400 select-none">
+                <div className="flex items-center gap-1 uppercase font-bold tracking-wider">
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    teacherState.isListening ? "bg-red-500 animate-pulse" : "bg-emerald-400"
+                  }`} />
+                  <span>{teacherState.isListening ? "Voice capture active" : "Ready to correct grammar"}</span>
+                </div>
+                <div className="flex gap-1.5 font-bold text-slate-450">
+                  <span>Accent: {accentPreference}</span>
+                  <span>•</span>
+                  <span>Speed: {speedPreference}</span>
+                </div>
+              </div>
+
+            </div>
 
           </section>
 
-          {/* Right Side: Robust Sidebar featuring Practice Chat & User Progress Dashboard modes */}
-          <section className="w-full lg:w-1/3 bg-white border-t lg:border-t-0 lg:border-l border-slate-200 flex flex-col h-[50%] lg:h-full overflow-hidden" id="session-dashboard-sidebar">
+          {/* RIGHT COLUMN: Sidebar hosting Serena Avatar, Settings and Logs tabs (1/3 size) */}
+          <section className="w-full lg:w-1/3 bg-white border-t lg:border-t-0 lg:border-l border-slate-250/50 flex flex-col h-[60%] lg:h-full overflow-hidden shrink-0 select-none" id="coach-dashboard-panel-sidebar">
             
-            {/* Elegant Tab Switcher - Fits Immersive UI styling guidelines */}
-            <div className="flex border-b border-slate-150 bg-slate-50 p-2 gap-1 select-none shrink-0" id="sidebar-tab-navigation">
+            {/* Swappable Sidebar navigation */}
+            <div className="flex border-b border-slate-100 bg-slate-50 p-2 gap-1 shrink-0" id="sidebar-tab-switcher">
               <button
                 type="button"
-                onClick={() => setActiveTab("practice")}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  activeTab === "practice"
-                    ? "bg-white text-blue-600 shadow-sm border border-slate-100"
+                onClick={() => setSidebarActiveTab("coach")}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  sidebarActiveTab === "coach"
+                    ? "bg-white text-blue-600 shadow-3xs border border-slate-100"
                     : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                 }`}
-                id="tab-practice"
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-                Practice Chat
+                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                Coach Profile
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSidebarActiveTab("vocab")}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  sidebarActiveTab === "vocab"
+                    ? "bg-white text-blue-600 shadow-3xs border border-slate-100"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                }`}
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-emerald-500" />
+                Vocabulary ({vocabList.length})
               </button>
               
               <button
                 type="button"
-                onClick={() => setActiveTab("dashboard")}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  activeTab === "dashboard"
-                    ? "bg-white text-blue-600 shadow-sm border border-slate-100"
+                onClick={() => setSidebarActiveTab("dashboard")}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  sidebarActiveTab === "dashboard"
+                    ? "bg-white text-blue-600 shadow-3xs border border-slate-100"
                     : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
                 }`}
-                id="tab-dashboard"
               >
-                <LayoutDashboard className="w-3.5 h-3.5" />
-                User Dashboard
+                <LayoutDashboard className="w-3.5 h-3.5 text-orange-500" />
+                Analytics
               </button>
             </div>
 
-            {activeTab === "practice" ? (
-              // PRACTICE TAB MODE (Original Conversational Dialogue Experience)
-              <div className="flex-1 flex flex-col overflow-hidden" id="practice-tab-viewport">
-                {/* Scrollable logs & Analyzers segment */}
-                <div className="flex-1 p-5 md:p-6 overflow-y-auto space-y-6 flex flex-col" ref={chatScrollRef}>
+            {/* ACTIVE SIDEBAR TAB DISPLAY */}
+            <div className="flex-1 flex flex-col overflow-hidden" id="sidebar-tab-content-container">
+              
+              {sidebarActiveTab === "coach" && (
+                // COACH TAB: Smaller Avatar layout placing controls securely below Serena profile
+                <div className="flex-1 flex flex-col overflow-y-auto p-5 space-y-5" id="sidebar-coach-profile">
                   
-                  {/* Scenario selector triggers */}
-                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100 space-y-3">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 uppercase tracking-widest">
-                      <Compass className="w-4 h-4 text-blue-500 animate-spin-slow" />
-                      <span>Practice Scenarios</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {PRACTICE_PROMPTS.map((p, i) => (
+                  {/* Avatar card: Beautiful smaller viewport nested inside a container card */}
+                  <div className="w-full bg-slate-50 rounded-2xl p-1 border border-slate-100 shadow-xs flex flex-col overflow-hidden">
+                    <div className="w-full h-44 relative bg-radial from-blue-50 to-white flex items-center justify-center overflow-hidden rounded-xl">
+                      <CoachAvatar
+                        isSpeaking={teacherState.isSpeaking}
+                        isListening={teacherState.isListening}
+                        isProcessing={teacherState.isProcessing}
+                      />
+
+                      {/* Speaking overlay interrupter button */}
+                      {teacherState.isSpeaking && (
                         <button
-                          key={i}
-                          type="button"
-                          onClick={() => handleSelectScenario(p.hint)}
-                          className="text-left py-2 px-3 rounded-xl bg-white border border-slate-200/60 hover:border-blue-300 hover:bg-blue-50/30 transition-all text-xs font-medium text-slate-700 flex items-center justify-between group shadow-3xs cursor-pointer"
+                          onClick={stopVoiceOnCommand}
+                          className="absolute bottom-2.5 right-2.5 px-2.5 py-1.5 bg-red-500/90 text-white rounded-lg text-[10px] font-bold shadow-xs hover:bg-red-600 transition-all flex items-center gap-1 backdrop-blur-xs cursor-pointer"
                         >
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-blue-600 uppercase leading-none mb-0.5">{p.category}</span>
-                            <span className="text-slate-800 tracking-tight leading-snug">{p.scenario}</span>
-                          </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transform group-hover:translate-x-0.5 transition-transform" />
+                          <Square className="w-2.5 h-2.5 fill-white text-white" /> Stop Voice
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
 
-                  {/* Live Analyzed Grammar Corrections Board (Styled in warm amber matching the Immersive theme exactly!) */}
-                  <AnimatePresence mode="wait">
-                    {lastAnalysis ? (
-                      <motion.div
-                        key={lastAnalysis.original}
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 shadow-sm"
+                  {/* ACCENT AND VOICE SETTINGS - Dropdowns & buttons for precise speech customizations */}
+                  <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-150 shadow-3sm space-y-4">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider pb-1.5 border-b border-slate-200/50">
+                      <Settings className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Speech Settings</span>
+                    </div>
+
+                    {/* 1. Dropdown menu to select accent (Neutral English, Indian English, British English) */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        Tutor Accent:
+                      </label>
+                      <select
+                        value={accentPreference}
+                        onChange={(e) => {
+                          setAccentPreference(e.target.value as any);
+                          stopVoiceOnCommand();
+                        }}
+                        className="w-full text-xs font-semibold bg-white border border-slate-200 rounded-xl p-2.5 text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/10 cursor-pointer"
                       >
-                        <div className="flex items-center justify-between gap-1 mb-2.5">
-                          <span className="text-amber-700 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                            <BookOpen className="w-3.5 h-3.5" /> Grammatical Evaluation
-                          </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            lastAnalysis.isCorrect 
-                              ? "bg-green-100 text-green-700" 
-                              : "bg-orange-100 text-orange-700"
-                          }`}>
-                            {lastAnalysis.isCorrect ? "Perfect English" : "Incorrect grammar"}
-                          </span>
-                        </div>
+                        <option value="neutral">Neutral English (US / Canada)</option>
+                        <option value="indian">Indian English (India)</option>
+                        <option value="british">British English (UK)</option>
+                      </select>
+                    </div>
 
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-mono font-semibold">Before Correction:</p>
-                            <p className="text-xs text-slate-600 line-through italic">&ldquo;{lastAnalysis.original}&rdquo;</p>
-                          </div>
-
-                          {!lastAnalysis.isCorrect && (
-                            <div className="p-3 bg-white rounded-xl border border-amber-100 space-y-1">
-                              <div className="flex justify-between items-center text-xs pb-1 border-b border-amber-50">
-                                <span className="font-mono text-[9px] text-slate-450 uppercase">Try Saying Instead:</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveToVocabList(lastAnalysis.suggestions, "Correct grammar phrasing model", `Replacing sentence error: "${lastAnalysis.original}"`)}
-                                  className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 active:scale-95 transition-colors cursor-pointer"
-                                  title="Add correct structure to your Vocabulary Deck"
-                                >
-                                  <Bookmark className="w-3.5 h-3.5" /> Save Phrasing
-                                </button>
-                              </div>
-                              <p className="text-xs font-bold text-slate-800 leading-relaxed pt-1">
-                                {lastAnalysis.suggestions}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="bg-white/60 p-2.5 rounded-xl border border-amber-100/30 text-xs text-slate-700 leading-relaxed font-normal">
-                            <span className="font-bold text-slate-800">Cody's Tip: </span>
-                            {lastAnalysis.corrections}
-                          </div>
-
-                          <p className="text-xs italic text-indigo-600 font-semibold text-center border-t border-amber-200/50 pt-2.5 flex items-center justify-center gap-1.5">
-                            <ThumbsUp className="w-3.5 h-3.5" /> &ldquo;{lastAnalysis.encouragement}&rdquo;
-                          </p>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-400 flex flex-col gap-2 items-center justify-center">
-                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center">
-                          <Sparkles className="w-5 h-5 text-blue-400 animate-pulse" />
-                        </div>
-                        <span className="text-xs font-semibold text-slate-700">Tutor Cody Ready</span>
-                        <p className="text-[11px] text-slate-400 leading-relaxed max-w-xs">
-                          Type your sentence below or speak to practice. Your live feedback, alternate pathways, and spelling checks will show up right here!
-                        </p>
+                    {/* 2. Option to choose female or male voice */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        Voice Gender:
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGenderPreference("female");
+                            stopVoiceOnCommand();
+                          }}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                            genderPreference === "female"
+                              ? "bg-blue-600 text-white border-blue-600 shadow-3xs"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          👩 Female Voice
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGenderPreference("male");
+                            stopVoiceOnCommand();
+                          }}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                            genderPreference === "male"
+                              ? "bg-blue-600 text-white border-blue-600 shadow-3xs"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          👨 Male Voice
+                        </button>
                       </div>
+                    </div>
+
+                    {/* 3. Option to adjust speaking speed (slow, normal, fast) */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        Speaking Speed:
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5 mt-0.5" id="speaking-speed-options">
+                        {(["slow", "normal", "fast"] as const).map((spd) => (
+                          <button
+                            key={spd}
+                            type="button"
+                            onClick={() => {
+                              setSpeedPreference(spd);
+                              stopVoiceOnCommand();
+                            }}
+                            className={`py-1.5 px-1.5 text-xs font-bold rounded-lg border transition-all text-center uppercase cursor-pointer ${
+                              speedPreference === spd
+                                ? "bg-slate-800 text-white border-slate-800"
+                                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {spd === "slow" ? "🐢 Slow" : spd === "normal" ? "⚡ Normal" : "🚀 Fast"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Active Speech Device Label */}
+                  <div className="p-3 bg-blue-50/40 rounded-xl text-[10px] text-slate-500 flex items-center gap-1.5 font-medium border border-blue-100/10">
+                    <span className="w-1 px-1 rounded bg-blue-200 text-blue-700 font-extrabold text-[8px]">TTS</span>
+                    <span className="truncate">
+                      Speech Profile: {selectedVoice || "Loading native OS engine..."}
+                    </span>
+                  </div>
+
+                  {/* Statistics highlights directly at the base */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 text-center" id="quick-coach-stats">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Score</p>
+                      <p className="text-xl font-black text-slate-800 leading-tight">{accuracyPercent}%</p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Mistakes Cached</p>
+                      <p className="text-xl font-black text-slate-800 leading-tight">{grammarErrors.length}</p>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {sidebarActiveTab === "vocab" && (
+                // VOCAB CONTAINER: Large, scrollable vocabulary deck with manual additions
+                <div className="flex-1 flex flex-col overflow-hidden p-5 space-y-4" id="sidebar-vocabulary-deck">
+                  <div className="flex items-center justify-between shrink-0">
+                    <span className="text-xs font-black uppercase text-slate-500 tracking-wider">Active Flashcards</span>
+                    <button
+                      onClick={() => setShowAddVocabForm(!showAddVocabForm)}
+                      className="py-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-100 transition-colors cursor-pointer"
+                    >
+                      {showAddVocabForm ? "Close Form" : "+ Add Phrase"}
+                    </button>
+                  </div>
+
+                  {/* Expandable Manual Add Vocab form block */}
+                  <AnimatePresence>
+                    {showAddVocabForm && (
+                      <motion.form
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (vocabWordToAdd.trim()) {
+                            handleSaveToVocabList(vocabWordToAdd, vocabMeaningToAdd, vocabSentenceToAdd);
+                            setVocabWordToAdd("");
+                            setVocabMeaningToAdd("");
+                            setVocabSentenceToAdd("");
+                            setShowAddVocabForm(false);
+                          }
+                        }}
+                        className="p-3 bg-slate-50 rounded-xl border border-slate-150 space-y-2.5 overflow-hidden shrink-0"
+                      >
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-slate-400">Word or key phrase*</label>
+                          <input
+                            type="text"
+                            required
+                            value={vocabWordToAdd}
+                            onChange={(e) => setVocabWordToAdd(e.target.value)}
+                            placeholder="e.g. Reservation"
+                            className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-slate-400">Meaning context</label>
+                          <input
+                            type="text"
+                            value={vocabMeaningToAdd}
+                            onChange={(e) => setVocabMeaningToAdd(e.target.value)}
+                            placeholder="e.g. Table reservation"
+                            className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-slate-400">Example Sentence</label>
+                          <input
+                            type="text"
+                            value={vocabSentenceToAdd}
+                            onChange={(e) => setVocabSentenceToAdd(e.target.value)}
+                            placeholder="e.g. I made a new dining reservation."
+                            className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
+                        >
+                          Save Word
+                        </button>
+                      </motion.form>
                     )}
                   </AnimatePresence>
 
-                  {/* Chat Message transcripts panel list */}
-                  <div className="space-y-4 pt-3 border-t border-slate-100 flex-1 flex flex-col min-h-[160px]">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky top-0 bg-white py-1">Chat transcript</p>
-                    {messages.length === 0 ? (
-                      <div className="text-center py-6 text-slate-300 text-xs">
-                        No replies log yet during this speaking session.
-                      </div>
-                    ) : (
-                      messages.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`flex gap-3 ${
-                            item.role === "user" ? "justify-end" : "justify-start"
-                          }`}
-                        >
-                          {item.role !== "user" && (
-                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-xs select-none">
-                              C
-                            </div>
-                          )}
-                          
-                          <div className={`p-3.5 rounded-2xl max-w-[80%] ${
-                            item.role === "user"
-                              ? "bg-blue-600 text-white rounded-tr-none text-sm animate-fade-in"
-                              : "bg-slate-100 text-slate-800 rounded-tl-none text-sm border border-slate-200/40"
-                          }`}>
-                            <p className="leading-relaxed">{item.text}</p>
-                            
-                            {item.role === "model" && item.speechText && (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-dashed border-slate-200">
-                                <button
-                                  type="button"
-                                  onClick={() => playVoiceSynthesis(item.speechText!)}
-                                  className="text-[10px] font-bold py-1 px-2.5 bg-white border border-slate-200 rounded-lg text-blue-600 hover:bg-blue-50/50 flex items-center gap-1 active:scale-95 transition-all shadow-3xs cursor-pointer"
-                                  id={`listen-vocal-${item.id}`}
-                                >
-                                  <Play className="w-3 h-3 fill-blue-600 text-blue-600" /> Speak Out Loud
-                                </button>
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveToVocabList(item.text, "Dialogue sentence from Cody", "Extracted item from live practice transcript.")}
-                                  className="text-[10px] font-bold py-1 px-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-500 flex items-center gap-1 active:scale-95 transition-colors cursor-pointer"
-                                  title="Add to study vocabulary"
-                                  id={`save-vocab-badge-${item.id}`}
-                                >
-                                  <Bookmark className="w-3 h-3 text-slate-400" /> Save Vocab
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-
-                    {/* Processing overlay state */}
-                    {teacherState.isProcessing && (
-                      <div className="flex gap-3 justify-start animate-pulse">
-                        <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-400 flex-shrink-0 flex items-center justify-center font-bold text-xs">
-                          ...
-                        </div>
-                        <div className="bg-slate-50 p-3.5 rounded-2xl rounded-tl-none border border-slate-100 text-slate-500 text-xs flex items-center gap-1.5">
-                          Evaluating grammar phrasing...
-                        </div>
-                      </div>
-                    )}
+                  {/* Filter search box */}
+                  <div className="relative shrink-0">
+                    <input
+                      type="text"
+                      value={vocabSearchQuery}
+                      onChange={(e) => setVocabSearchQuery(e.target.value)}
+                      placeholder="Search flashcards..."
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-205 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white"
+                      id="search-vocab-deck"
+                    />
                   </div>
 
-                </div>
-
-                {/* Error alerts widget overlay, placed safely */}
-                {errorMessage && (
-                  <div className="mx-6 my-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-600 animate-bounce" />
-                    <span className="flex-1">{errorMessage}</span>
-                    <button
-                      type="button"
-                      onClick={() => setErrorMessage(null)}
-                      className="text-[10px] font-bold text-red-500 px-1 hover:text-red-700 cursor-pointer"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-
-                {/* Interactive User Input Form Bar structured matching Immersive UI exact mockup specifications */}
-                <div className="p-6 border-t border-slate-100 bg-slate-50/50 shrink-0">
-                  <div className="relative flex items-center">
-                    
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (userInput.trim()) handleSubmitConversation(userInput);
-                      }}
-                      className="w-full relative flex items-center"
-                    >
-                      <input
-                        type="text"
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        placeholder={
-                          teacherState.isListening
-                            ? "Speak clearly to Cody now..."
-                            : "Type an English sentence to correct..."
-                        }
-                        disabled={teacherState.isListening}
-                        className="w-full pl-6 pr-24 py-4 bg-white border border-slate-200 rounded-full shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-sm text-slate-800 placeholder-slate-400"
-                        id="user-conversation-input"
-                      />
-
-                      {/* Absolute positioning of control buttons on the right side of input */}
-                      <div className="absolute right-2.5 flex items-center gap-1.5">
-                        
-                        {/* Speech Dictation Mic Trigger */}
-                        <button
-                          type="button"
-                          onClick={toggleSpeechRecognition}
-                          className={`p-2 rounded-full transition-all cursor-pointer ${
-                            teacherState.isListening
-                              ? "bg-red-500 text-white animate-pulse shadow-md"
-                              : "bg-blue-100 text-blue-600 hover:bg-blue-200"
-                          }`}
-                          title={teacherState.isListening ? "Listening - Click to finish" : "Microphone Speech Input"}
-                        >
-                          {teacherState.isListening ? (
-                            <MicOff className="w-4.5 h-4.5" />
-                          ) : (
-                            <Mic className="w-4.5 h-4.5" />
-                          )}
-                        </button>
-
-                        {/* Send Message Trigger */}
-                        <button
-                          type="submit"
-                          disabled={!userInput.trim() || teacherState.isProcessing || teacherState.isListening}
-                          className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shadow-sm"
-                          title="Send sentence for analysis"
-                          id="send-conversation-btn"
-                        >
-                          <Send className="w-4.5 h-4.5" />
-                        </button>
-                        
-                      </div>
-                    </form>
-
-                  </div>
-
-                  {/* Status footer inside input zone */}
-                  <div className="mt-3.5 flex justify-between items-center px-1 text-[10px] select-none text-slate-400">
-                    <div className="flex items-center gap-1.5 uppercase font-bold tracking-wider">
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        teacherState.isListening ? "bg-red-500 animate-ping" : "bg-blue-400"
-                      }`}></span>
-                      <span>{teacherState.isListening ? "Voice Mode Active" : "Interactive Input Mode"}</span>
-                    </div>
-                    <div className="flex gap-2 font-semibold">
-                      <span>{voices.length} synthesizer voices available</span>
-                    </div>
-                  </div>
-
-                  {/* Interim voice transcribing visual block */}
-                  {interimTranscript && (
-                    <div className="absolute bottom-20 left-6 right-6 bg-slate-900/90 text-white px-4 py-2 rounded-2xl text-xs font-mono shadow-lg flex items-center gap-2 z-10 animate-pulse">
-                      <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                      <p className="line-clamp-1 italic">&ldquo;{interimTranscript}&rdquo;</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              // USER PROGRESS DASHBOARD TAB MODE
-              <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/50" id="progress-dashboard-viewport">
-                
-                {/* Scrollable Dashboard Pane */}
-                <div className="flex-1 p-5 md:p-6 overflow-y-auto space-y-6">
-                  
-                  {/* Streak & Core Stat Dashboard Row Cards */}
-                  <div className="grid grid-cols-2 gap-3" id="dashboard-numeric-metrics-grid">
-                    
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-150 shadow-3xs flex flex-col justify-between">
-                      <div className="flex items-center gap-1.5 text-slate-400">
-                        <Activity className="w-4 h-4 text-blue-500" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Evaluations</span>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{totalAttempts}</p>
-                        <p className="text-[10px] text-slate-400 mt-1 font-medium">Sentences checked</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-150 shadow-3xs flex flex-col justify-between">
-                      <div className="flex items-center gap-1.5 text-slate-400">
-                        <Award className="w-4 h-4 text-amber-500" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Grammar Score</span>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{accuracyPercent}%</p>
-                        <p className="text-[10px] text-slate-400 mt-1 font-medium">Correct grammar tenses</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-150 shadow-3xs flex flex-col justify-between">
-                      <div className="flex items-center gap-1.5 text-slate-400">
-                        <BookOpen className="w-4 h-4 text-emerald-500" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Vocabs Logged</span>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{vocabList.length}</p>
-                        <p className="text-[10px] text-slate-400 mt-1 font-semibold">Active flashcards</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-150 shadow-3xs flex flex-col justify-between">
-                      <div className="flex items-center gap-1.5 text-slate-400">
-                        <Calendar className="w-4 h-4 text-purple-500" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">Active Days</span>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{sessions.length || 1}</p>
-                        <p className="text-[10px] text-slate-400 mt-1 font-semibold">Practice session records</p>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* ACTIVE STUDY STREAK BLOCK */}
-                  <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-4 text-white shadow-xs flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                        <Flame className="w-6 h-6 animate-pulse" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-100">Daily Streak Progress</p>
-                        <h4 className="text-base font-black tracking-tight">{streakCount} Sentences Answered Correctly</h4>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-orange-200">Level</p>
-                      <p className="text-xs font-black bg-white/25 px-2 py-0.5 rounded-full mt-0.5">
-                        {streakCount > 10 ? "Fluent Explorer" : streakCount > 4 ? "Tense Master" : "Language Novice"}
+                  {/* Scrollable list frame */}
+                  <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                    {vocabList.length === 0 ? (
+                      <p className="text-center text-[11px] text-slate-400 italic py-8 leading-relaxed">
+                        No words saved yet. Tap "Save Vocab" on Serena's response bubbles, or add a word above!
                       </p>
-                    </div>
-                  </div>
-
-                  {/* VOCABULARY LEARNED DECK EXPANSION */}
-                  <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-3xs space-y-4" id="dashboard-vocabulary-center">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-slate-800">
-                        <GraduationCap className="w-4 h-4 text-emerald-500" />
-                        <h3 className="text-xs font-bold uppercase tracking-widest">My Vocabulary Deck ({vocabList.length})</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddVocabForm(!showAddVocabForm)}
-                        className="py-1 px-2.5 bg-blue-55 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-100 transition-colors flex items-center gap-1 cursor-pointer"
-                        id="toggle-vocab-form-btn"
-                      >
-                        {showAddVocabForm ? "Hide Form" : "+ Add Word"}
-                      </button>
-                    </div>
-
-                    {/* Expandable Manual Add Vocab form block */}
-                    <AnimatePresence>
-                      {showAddVocabForm && (
-                        <motion.form
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            if (vocabWordToAdd.trim()) {
-                              handleSaveToVocabList(vocabWordToAdd, vocabMeaningToAdd, vocabSentenceToAdd);
-                              setVocabWordToAdd("");
-                              setVocabMeaningToAdd("");
-                              setVocabSentenceToAdd("");
-                              setShowAddVocabForm(false);
-                            }
-                          }}
-                          className="p-3 bg-slate-50 rounded-xl border border-slate-150 space-y-2.5 overflow-hidden"
-                          id="manual-vocab-add-form"
-                        >
-                          <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400">Vocabulary Word / Key Phrase*</label>
-                            <input
-                              type="text"
-                              required
-                              value={vocabWordToAdd}
-                              onChange={(e) => setVocabWordToAdd(e.target.value)}
-                              placeholder="e.g. Reservation"
-                              className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400">Meaning / Context Translation</label>
-                            <input
-                              type="text"
-                              value={vocabMeaningToAdd}
-                              onChange={(e) => setVocabMeaningToAdd(e.target.value)}
-                              placeholder="e.g. Booking a seat or table in advance"
-                              className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400 font-medium">Example Practice Sentence</label>
-                            <input
-                              type="text"
-                              value={vocabSentenceToAdd}
-                              onChange={(e) => setVocabSentenceToAdd(e.target.value)}
-                              placeholder="e.g. I made a dinner reservation for tomorrow night."
-                              className="w-full text-xs p-2 bg-white border border-slate-200 rounded-lg mt-0.5 focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-                          <button
-                            type="submit"
-                            className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-2xs cursor-pointer"
-                          >
-                            Save Word to Desk
-                          </button>
-                        </motion.form>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Vocab filter search bar */}
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        value={vocabSearchQuery}
-                        onChange={(e) => setVocabSearchQuery(e.target.value)}
-                        placeholder="Search word deck..."
-                        className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400"
-                        id="vocab-deck-search"
-                      />
-                    </div>
-
-                    {/* List Grid view of vocabulary cards */}
-                    <div className="space-y-2.5 max-h-[190px] overflow-y-auto pr-1" id="vocab-items-scroller">
-                      {vocabList.length === 0 ? (
-                        <p className="text-center text-[11px] text-slate-400 italic py-4">No vocabulary words bookmarked yet. Tap "Save to Vocab" inside chat logs or add manually!</p>
-                      ) : (vocabSearchQuery ? vocabList.filter(item => item.word.toLowerCase().includes(vocabSearchQuery.toLowerCase()) || item.meaning.toLowerCase().includes(vocabSearchQuery.toLowerCase())) : vocabList).map((item) => (
+                    ) : (
+                      (vocabSearchQuery 
+                        ? vocabList.filter(v => 
+                            v.word.toLowerCase().includes(vocabSearchQuery.toLowerCase()) || 
+                            v.meaning.toLowerCase().includes(vocabSearchQuery.toLowerCase())
+                          ) 
+                        : vocabList
+                      ).map((item) => (
                         <div
                           key={item.id}
-                          className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-150 relative group flex flex-col hover:bg-white hover:shadow-2xs transition-all"
-                          id={`vocab-item-card-${item.id}`}
+                          className="bg-slate-50/60 p-3 rounded-xl border border-slate-150 relative group flex flex-col hover:bg-white hover:shadow-3xs transition-all"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 leading-snug">
+                            <span className="text-xs font-bold text-slate-800 leading-snug">
                               📘 {item.word}
                             </span>
-                            <div className="flex items-center gap-1 text-slate-400 group-hover:text-slate-600">
+                            <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
                               <button
                                 type="button"
-                                onClick={() => playVoiceSynthesis(`${item.word}. Usage context: ${item.sentence}`)}
-                                className="p-1 hover:bg-white hover:text-blue-500 rounded-md transition-colors cursor-pointer"
-                                title="Synthesizer: Listen word pronunciation"
+                                onClick={() => playVoiceSynthesis(`${item.word}. Usage: ${item.sentence}`)}
+                                className="p-1 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors cursor-pointer text-slate-400"
                               >
-                                <Play className="w-3.5 h-3.5 fill-current text-blue-500" />
+                                <Play className="w-3 h-3 fill-current text-blue-500" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveFromVocabList(item.id)}
-                                className="p-1 hover:bg-white hover:text-red-500 rounded-md transition-colors cursor-pointer text-slate-300"
-                                title="Remove word from active study deck"
+                                className="p-1 hover:bg-slate-100 hover:text-red-500 rounded transition-colors cursor-pointer text-slate-350"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
                           </div>
                           
                           {item.meaning && (
-                            <p className="text-[10px] text-slate-500 italic mt-1 leading-snug">
-                              Meaning: {item.meaning}
+                            <p className="text-[10px] text-slate-500 mt-1 pl-1 italic leading-snug">
+                              Context: {item.meaning}
                             </p>
                           )}
                           
                           {item.sentence && (
-                            <div className="p-1.5 bg-white border border-slate-100 rounded-lg mt-1.5 text-[10px] text-slate-600 font-medium tracking-tight">
-                              Usage: &ldquo;<span className="font-semibold text-slate-800">{item.sentence}</span>&rdquo;
+                            <div className="p-2 bg-white border border-slate-100 rounded-lg mt-1.5 text-[10px] text-slate-600 font-medium">
+                              Example: &ldquo;<span className="font-semibold text-slate-800">{item.sentence}</span>&rdquo;
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
 
+              {sidebarActiveTab === "dashboard" && (
+                // ANALYTICS / MISTAKES TAB
+                <div className="flex-1 flex flex-col overflow-y-auto p-5 space-y-5 bg-slate-50/40" id="sidebar-analytics">
+                  
+                  {/* Streak widget wrapper */}
+                  <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-4 text-white shadow-3sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                        <Flame className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-orange-100">Speaking Streak</p>
+                        <h4 className="text-sm font-black tracking-tight">{streakCount} in a Row</h4>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] opacity-75 uppercase leading-none">Level</p>
+                      <span className="text-[10px] font-black bg-white/25 px-2 py-0.5 rounded-full mt-0.5 inline-block">
+                        {streakCount > 10 ? "Explorer Plus" : streakCount > 4 ? "Speaker" : "Trainee"}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* MASTERED GRAMMAR ERRORS LEDGER */}
-                  <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-3xs space-y-4" id="dashboard-grammar-ledger">
-                    <div className="flex items-center gap-1.5 text-slate-800">
+                  {/* Statistics matrix grids */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="bg-white p-3 rounded-xl border border-slate-150 text-center">
+                      <Activity className="w-4 h-4 text-blue-500 mx-auto" />
+                      <p className="text-lg font-black mt-1 text-slate-850 leading-none">{totalAttempts}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 uppercase font-bold tracking-tight">Evaluations</p>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-xl border border-slate-150 text-center">
+                      <Award className="w-4 h-4 text-emerald-500 mx-auto" />
+                      <p className="text-lg font-black mt-1 text-slate-850 leading-none">{accuracyPercent}%</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 uppercase font-bold tracking-tight">Accuracy</p>
+                    </div>
+                  </div>
+
+                  {/* Grammar errors list ledger */}
+                  <div className="space-y-3.5 pt-2 flex-1 flex flex-col overflow-hidden">
+                    <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-slate-500 shrink-0">
                       <AlertCircle className="w-4 h-4 text-orange-500" />
-                      <h3 className="text-xs font-bold uppercase tracking-widest">Grammar Errors Tracker ({grammarErrors.length})</h3>
+                      <span>Grammar Errors List ({grammarErrors.length})</span>
                     </div>
 
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={grammarSearchQuery}
-                        onChange={(e) => setGrammarSearchQuery(e.target.value)}
-                        placeholder="Search errors database..."
-                        className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400"
-                        id="grammar-errors-search"
-                      />
-                    </div>
-
-                    <div className="space-y-2.5 max-h-[190px] overflow-y-auto pr-1" id="grammar-errors-scroller">
+                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
                       {grammarErrors.length === 0 ? (
-                        <p className="text-center text-[10px] text-slate-400 italic py-4 flex flex-col items-center justify-center gap-1.5">
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                          No active grammar errors recorded yet. Practice checking sentences with Cody!
-                        </p>
-                      ) : (grammarSearchQuery ? grammarErrors.filter(item => item.original.toLowerCase().includes(grammarSearchQuery.toLowerCase()) || item.corrected.toLowerCase().includes(grammarSearchQuery.toLowerCase()) || item.explanation.toLowerCase().includes(grammarSearchQuery.toLowerCase())) : grammarErrors).map((item) => (
-                        <div
-                          key={item.id}
-                          className="bg-amber-50/40 p-3 rounded-xl border border-amber-100/50 hover:bg-amber-50/80 transition-all flex flex-col space-y-2"
-                        >
-                          <div>
-                            <span className="text-[9px] font-mono uppercase bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">Mistake</span>
-                            <p className="text-xs text-slate-500 line-through italic mt-1 leading-snug pl-1">
-                              &ldquo;{item.original}&rdquo;
-                            </p>
-                          </div>
+                        <div className="text-center py-6 text-[11px] text-slate-400 italic">
+                          No errors recorded! Practice typing or speaking sentences with Serena.
+                        </div>
+                      ) : (
+                        grammarErrors.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-amber-50/20 p-3 rounded-xl border border-amber-100/50 flex flex-col space-y-2 text-xs"
+                          >
+                            <div>
+                              <span className="text-[8px] font-mono uppercase bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">Mistake</span>
+                              <p className="text-slate-500 line-through italic mt-1 pl-1 text-[11px]">
+                                &ldquo;{item.original}&rdquo;
+                              </p>
+                            </div>
 
-                          <div>
-                            <span className="text-[9px] font-mono uppercase bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded">Learned Alternative</span>
-                            <p className="text-xs font-bold text-slate-800 mt-1 leading-snug pl-1">
-                              {item.corrected}
-                            </p>
-                          </div>
+                            <div>
+                              <span className="text-[8px] font-mono uppercase bg-green-150 text-green-700 font-bold px-1.5 py-0.5 rounded">Learned Correction</span>
+                              <p className="font-bold text-slate-800 mt-1 pl-1">
+                                {item.corrected}
+                              </p>
+                            </div>
 
-                          {item.explanation && (
-                            <p className="text-[10px] text-slate-600 bg-white/70 p-2 rounded-lg border border-amber-100/30">
-                              <span className="font-bold text-slate-700 font-sans">Why: </span>
-                              {item.explanation}
-                            </p>
-                          )}
+                            {item.explanation && (
+                              <p className="text-[10px] text-slate-600 bg-white p-2 rounded-lg border border-amber-500/10 leading-relaxed font-sans mt-1">
+                                <span className="font-bold text-slate-700">Explainer:</span> {item.explanation}
+                              </p>
+                            )}
 
-                          <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-amber-500/10">
-                            <span className="text-[9px] text-slate-400">{item.savedAt}</span>
-                            
-                            <div className="flex gap-2">
-                              {/* Mastered/Dismiss trigger */}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveGrammarError(item.id)}
-                                className="py-0.5 px-2 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 text-[10px] font-bold rounded-lg border border-slate-200 hover:border-emerald-100 transition-colors cursor-pointer"
-                                title="Mark grammatical tense category as Mastered"
-                                id={`mastered-err-${item.id}`}
-                              >
-                                Mastered ✓
-                              </button>
-
-                              {/* Try Again / Set input trigger */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setUserInput(item.original);
-                                  setActiveTab("practice");
-                                }}
-                                className="py-0.5 px-2 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Preset this sentence in inputs to retry master evaluation"
-                                id={`retry-err-${item.id}`}
-                              >
-                                Try Again
-                              </button>
+                            <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-amber-500/10 shrink-0">
+                              <span className="text-[9px] text-slate-400">{item.savedAt}</span>
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveGrammarError(item.id)}
+                                  className="py-0.5 px-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-105 text-emerald-700 text-[10px] font-bold rounded-md transition-colors cursor-pointer"
+                                >
+                                  Mastered ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUserInput(item.original);
+                                  }}
+                                  className="py-0.5 px-2 bg-blue-600 text-white text-[10px] font-bold rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
+                                >
+                                  Retry
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
-
                   </div>
 
-                  {/* DATA DISCIPLINE MAINTENANCE ROW */}
-                  <div className="pt-2 text-center">
+                  {/* Database reset row */}
+                  <div className="pt-2 shrink-0 border-t border-slate-205 text-center">
                     <button
                       type="button"
                       onClick={handleResetMetrics}
-                      className="text-[10px] text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
+                      className="text-[10px] text-red-500 hover:text-red-700 font-bold tracking-tight cursor-pointer"
                     >
-                      ⚠️ Reset entire progress database and files
+                      ⚠️ Reset metrics database
                     </button>
                   </div>
 
                 </div>
+              )}
 
-              </div>
-            )}
+            </div>
 
           </section>
 
         </main>
 
-        {/* Lower Status Info Bar */}
-        <footer className="h-10 bg-slate-100 border-t border-slate-200 px-6 md:px-8 flex items-center justify-between text-[10px] text-slate-500 font-medium select-none shrink-0">
+        {/* Lower Static Status Footer */}
+        <footer className="h-9 bg-slate-50 border-t border-slate-100 px-6 flex items-center justify-between text-[10px] text-slate-400 select-none shrink-0 font-medium">
           <div className="flex gap-4">
-            <span>Server Ingress: Port 3000</span>
-            <span>Synthesizer: HTML5 Web Speech API</span>
+            <span>Core Model: Gemini 3.5 Flash</span>
+            <span>Channel: Live Web Speech Synth</span>
           </div>
-          <div className="flex gap-4 items-center">
-            <span className="flex items-center gap-1">
-              Playback Volume
-              <div className="w-12 h-1 bg-slate-300 rounded-full overflow-hidden">
-                <div className={`h-full bg-blue-500 transition-all ${isAudioMuted ? "w-0" : "w-10/12"}`} />
-              </div>
-            </span>
-            <span className="uppercase text-[9px] font-mono tracking-widest">{selectedVoice ? selectedVoice.split(" ")[0] : "English Tutor Native"}</span>
+          <div className="hidden xs:flex gap-4 items-center uppercase font-mono tracking-widest text-[9px]">
+            <span>Active Accent Code: {selectedVoice ? selectedVoice.split(" ")[0] : "Female Humanoid"}</span>
           </div>
         </footer>
 
