@@ -1,0 +1,8 @@
+{
+  "name": "AI English Tutor",
+  "description": "An interactive AI-powered English speaking tutor with a humanoid 3D lipsynced avatar to correct grammar, suggest phrasings, and encourage learners.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
